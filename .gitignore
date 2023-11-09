@@ -1,0 +1,6 @@
+*.xml
+MapReduce/.idea/*
+MapReduce/.idea/*.xml 
+
+Spark/.idea/*
+Spark/.idea/*.xml
