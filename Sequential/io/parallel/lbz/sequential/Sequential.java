@@ -57,7 +57,6 @@ class Sequential implements Serializable {
         // calculate based on the communiteis present
         double[] modularities = new double[nodes + 1];
         System.out.println(Arrays.toString(this.nodeDegrees));
-        //        {1: {1}, 2: {2}, 3: {3}}
         // not ocnsidering other edges since the community function is always 0 because of different communities being present and chronicle function equals 1
         for (Map.Entry<Integer, HashSet<Integer>> val : this.communities.entrySet()){
             int node = val.getKey();
@@ -112,6 +111,8 @@ class Sequential implements Serializable {
     public void performOptimizations(int nodes, double olderGraphModularity){
         System.out.println(this.adjList);
         for (int node = 1; node <= nodes; node++){
+            // {1: {1}, 2: {2}, 3: {3, 1}}
+//            {1: {2, 4 , 6}
             int currentNode = node;
 
             // loop through all its neighbours to perform community optimizations
@@ -121,7 +122,7 @@ class Sequential implements Serializable {
                 if (newModularity <= olderGraphModularity){
                     this.communities.get(neighbours).remove(currentNode); // back track and remove if it did find a good friends with neighbours;
                 }
-//                System.out.println("new modularity is" + newModularity + " " + "current disjoint  communities " + this.communities);
+                System.out.println("new modularity is" + newModularity + " " + "current disjoint  communities " + this.communities);
             }
         }
         cleanDanglingCommunities();

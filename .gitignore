@@ -1,6 +1,10 @@
 *.xml
-# MapReduce/.idea/*.xml
-# MapReduce/.idea/*
+MapReduce/.idea/*.xml
+MapReduce/.idea/*
 
-# Spark/.idea/*
-# Spark/.idea/*.xml
+Spark/.idea/*
+Spark/.idea/*.xml
+
+
+Sequential/target/*
+
