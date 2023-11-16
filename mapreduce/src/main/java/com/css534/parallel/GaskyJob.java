@@ -2,13 +2,19 @@ package com.css534.parallel;
 
 import org.apache.hadoop.mapred.*;
 
+import java.io.IOException;
 
-public class Main {
-    public static void main(String[] args) {
+
+public class GaskyJob {
+    public static void main(String[] args) throws InterruptedException, IOException {
 
         JobConf conf = new JobConf();
         conf.setJobName("MRGasky_implementatio");
         conf.setMapperClass(GaskyMapper.class);
         conf.setReducerClass(GaskyReducer.class);
+
+        JobClient client = new JobClient();
+
+        System.out.println(conf.toString());
     }
 }
