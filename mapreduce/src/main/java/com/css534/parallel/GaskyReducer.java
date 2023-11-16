@@ -8,11 +8,13 @@ import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
 import java.util.Iterator;
+import java.util.Stack;
 
-public class GaskyReducer extends MapReduceBase implements Reducer<Text, Text, Text, Text> {
+public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, Text, Text, Text> {
+
 
     @Override
-    public void reduce(Text text, Iterator<Text> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
+    public void reduce(MapKeys mapKeys, Iterator<Text> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
 
     }
 }
