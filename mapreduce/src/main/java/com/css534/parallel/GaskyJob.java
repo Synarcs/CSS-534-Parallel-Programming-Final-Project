@@ -12,6 +12,7 @@ public class GaskyJob {
         conf.setJobName("MRGasky_implementatio");
         conf.setMapperClass(GaskyMapper.class);
         conf.setReducerClass(GaskyReducer.class);
+//        conf.setPartitionerClass((Class<? extends Partitioner>) RouteParitioner.class);
 
         JobClient client = new JobClient();
 
