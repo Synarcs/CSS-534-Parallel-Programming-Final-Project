@@ -14,7 +14,6 @@ import java.io.IOException;
 public class MapKeys implements WritableComparable<MapKeys> {
 
     private String featureName;
-    private int rowValue;
     private int colValue;
 
 
@@ -26,15 +25,15 @@ public class MapKeys implements WritableComparable<MapKeys> {
         int cmp = featureName.compareTo(other.featureName);
         if (cmp == 0) {
             cmp = Integer.compare(colValue, other.colValue);
-            if (cmp == 0) {
-                cmp = Integer.compare(rowValue, other.rowValue);
-            }
+//            if (cmp == 0) {
+//                cmp = Integer.compare(rowValue, other.rowValue);
+//            }
         }
         return cmp;
     }
 
-    public MapKeys(String featureName,int rowValue, int colValue){
-        this.rowValue = rowValue;
+    public MapKeys(String featureName, int colValue){
+//        this.rowValue = rowValue;
         this.colValue = colValue;
         this.featureName = featureName;
     }
@@ -46,14 +45,14 @@ public class MapKeys implements WritableComparable<MapKeys> {
     @Override
     public void write(DataOutput dataOutput) throws IOException {
         dataOutput.writeUTF(featureName);
-        dataOutput.writeInt(rowValue);
+//        dataOutput.writeInt(rowValue);
         dataOutput.writeInt(colValue);
     }
 
     @Override
     public void readFields(DataInput dataInput) throws IOException {
         featureName = dataInput.readUTF();
-        rowValue = dataInput.readInt();
+//        rowValue = dataInput.readInt();
         colValue = dataInput.readInt();
     }
 }

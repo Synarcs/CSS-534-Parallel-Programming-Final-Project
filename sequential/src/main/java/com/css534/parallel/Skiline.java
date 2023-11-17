@@ -8,6 +8,7 @@ import java.util.*;
 public class Skiline implements Serializable {
     double[][] grid;
     int[][][] favourableFacilities;
+
     int[][][] unfavourableFacilities;
 
     double[][] distanceTable;
@@ -67,7 +68,7 @@ public class Skiline implements Serializable {
         if (objects.size() == this.distanceTable.length)
             System.out.println("All points are selected tge Graph is Dense and " +
                     "the each of the point is dominant over other considering all the features");
-        System.out.println(objects);
+//        System.out.println(objects);
         return new ArrayList<>(objects);
     }
 
@@ -75,6 +76,7 @@ public class Skiline implements Serializable {
         for (int i=0 ; i< distanceTable.length; i++)
             System.out.println(Arrays.toString(distanceTable[i]));
     }
+
 
     public void skilineAlgorithm(int favCount, int unFavCount, int gridX, int gridY, boolean isCustom){
         int n = this.grid.length; int m = this.grid[0].length;
@@ -94,6 +96,7 @@ public class Skiline implements Serializable {
             // O(n ^ 4)
             for (int pointX = 0; pointX < n; pointX++){
                 for (int pointY = 0; pointY < m;  pointY++) {
+                    System.out.println("Processing the point " + pointX + " " + pointY);
                     int currentPointX = pointX;
                     int currentPointY = pointY;
                     if (currentPointY >= n || currentPointY >= m) return;
@@ -125,7 +128,7 @@ public class Skiline implements Serializable {
             }
             System.out.println("the total length for the 2d grid is" + this.distanceTable.length + " " + this.distanceTable[0].length);
 
-            if (debug)
+            if (!debug)
                 printDistanceTable(this.distanceTable);
             skylineObjectsPoints(favCount, unFavCount, gridX, gridY);
         }else {
@@ -169,8 +172,9 @@ public class Skiline implements Serializable {
     public static void main(String[] args) {
         int totalFavFacilitesTypes = 2;
         int unFavFaciliteType = 1;
-        int gridX = 10;
-        int gridY = 10;
+        int gridX = 500;
+        int gridY = 500;
+        long time = System.currentTimeMillis();
 
         Skiline line = new Skiline(gridX, gridY , totalFavFacilitesTypes, unFavFaciliteType);
 //        line.favourableFacilities[0] = new int[][]{{14, 49},{53,4},{43, 18}, {86, 17}, {1, 63}};
@@ -181,7 +185,8 @@ public class Skiline implements Serializable {
 //        line.unfavourableFacilities[0] = new int[][]{{32, 88}, {70, 54}};
         line.unfavourableFacilities[0] = new int[][]{{1, 5}, {3, 7}};
 
-        line.skilineAlgorithm(totalFavFacilitesTypes, unFavFaciliteType, gridX, gridY, true);
+        line.skilineAlgorithm(totalFavFacilitesTypes, unFavFaciliteType, gridX, gridY, false);
+        System.out.println(System.currentTimeMillis() - time);
     }
 
 }

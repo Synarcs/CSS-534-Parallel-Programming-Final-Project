@@ -11,8 +11,9 @@ import org.apache.hadoop.mapred.Reporter;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
-public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, Text, MapKeys, DoubleWritable> {
+public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, Text, MapKeys, MapValue> {
 
     private MapKeys keys;
 
@@ -52,7 +53,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         No implicit representation for the un fav types since they are implicitly present in map array
      */
     @Override
-    public void map(LongWritable longWritable, Text binaryImageRowInput, OutputCollector<MapKeys, DoubleWritable> outputCollector, Reporter reporter) throws IOException {
+    public void map(LongWritable longWritable, Text binaryImageRowInput, OutputCollector<MapKeys, MapValue> outputCollector, Reporter reporter) throws IOException {
         String inputFeatureMatrix = binaryImageRowInput.toString();
         String[] distFavArray = inputFeatureMatrix.split("\\s+");
         if (distFavArray.length == 0) return;
@@ -85,8 +86,8 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         }
 
         for (int values = 0; values < leftDistance.length; values++){
-            // keep the grid as 0 index based for each
-            outputCollector.collect(new MapKeys(facilityName,matrixRowNumber ,values + 1), new DoubleWritable(leftDistance[values]));
+            // keep the grid as 0 index based for each 1.... n
+            outputCollector.collect(new MapKeys(facilityName ,values + 1), new MapValue(matrixRowNumber,leftDistance[values]));
         }
     }
 
