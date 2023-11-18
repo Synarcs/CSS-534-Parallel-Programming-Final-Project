@@ -11,7 +11,9 @@ import java.io.Serializable;
 @AllArgsConstructor
 @Data
 @Builder
-public class NodeVectors implements Serializable {
-    private int row;
-    private double distance;
+public class Vector2FProjections implements Serializable {
+    private double xx;
+    private double yy;
 }
+
+

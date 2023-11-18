@@ -1,6 +1,5 @@
 package com.css534.parallel;
 
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.OutputCollector;
@@ -13,16 +12,23 @@ import java.util.stream.Collectors;
 
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
-    private double calcBisector(int x, int y , int x1, int y1){
-        return ((y1 * y1 ) - (y * y) + (x1 * x1) - (x * x)) / 2 * (x1 - x);
+    private Vector2FProjections calcBisector(int x, int y , int x1, int y1){
+        Vector2FProjections vector2F = new Vector2FProjections();
+        double xx = ((y1 * y1 ) - (y * y) + (x1 * x1) - (x * x)) / 2 * (x1 - x);
+        double yy = 0;
+        vector2F.setXx(xx); vector2F.setYy(yy);
+        return vector2F;
     }
 
 
+    private Text keyText = new Text();
     public void mrGaskyAlgorithm(){}
 
     private int findProximityDistance(){
         return 0;
     }
+
+    private int findProximityIntervalPoint(){ return 0; }
 
     private double findEuclideanDistance(int x, int y, int x1, int y1){
         return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
@@ -47,14 +53,14 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                 Each will get format
                 this gets all the values sorted based on their column values
         */
-        Stack<NodeVectors> values = new Stack<>();
+        Stack<Vector2FProjections> values = new Stack<>();
         List<Double> orderedRowValues = getOrderedRowValues(iterator);
 
         int nodeRows = 1;
         // generate init stack
         while (iterator.hasNext()){
             values.push(
-                    new NodeVectors(
+                    new Vector2FProjections(
                             nodeRows,
                             orderedRowValues.get(nodeRows - 1)
                     )
@@ -62,14 +68,18 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             nodeRows++;;
         }
 
-        while (!values.isEmpty()){
-            NodeVectors vector = values.pop();
-            outputCollector.collect(
-                    new Text(String.valueOf(vector.getRow())),
-                    new Text(String.valueOf(vector.getDistance()))
-            );
+
+        StringBuilder totalDistances = new StringBuilder();
+
+        for (Double data : orderedRowValues){
+            totalDistances.append(data);
+            totalDistances.append(" ");
         }
 
+        outputCollector.collect(
+                new Text(String.valueOf(mapKeys.getFeatureName() + " " + mapKeys.getColValue())),
+                new Text(totalDistances.toString())
+        );
     }
 
 }
