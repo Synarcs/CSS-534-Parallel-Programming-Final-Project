@@ -1,19 +1,28 @@
 package com.css534.parallel;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
+
 
 import java.io.Serializable;
 
-@NoArgsConstructor
-@AllArgsConstructor
-@Data
-@Builder
 public class Vector2FProjections implements Serializable {
     private double xx;
     private double yy;
+
+    public double getXx() {
+        return xx;
+    }
+
+    public double getYy() {
+        return yy;
+    }
+
+    public void setYy(double yy) {
+        this.yy = yy;
+    }
+
+    public void setXx(double xx) {
+        this.xx = xx;
+    }
 }
 
 

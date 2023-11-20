@@ -1,10 +1,5 @@
 package com.css534.parallel;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 import org.apache.hadoop.io.WritableComparable;
 
 import java.io.DataInput;
@@ -12,14 +7,20 @@ import java.io.DataOutput;
 import java.io.IOException;
 
 
-@Data
-@Builder
-@NoArgsConstructor
 public class MapKeys implements WritableComparable<MapKeys> {
 
     private String featureName;
     private int colValue;
     // private int rowValue;
+
+
+    public int getColValue() {
+        return colValue;
+    }
+
+    public String getFeatureName() {
+        return featureName;
+    }
 
     @Override
     public int compareTo(MapKeys other) {

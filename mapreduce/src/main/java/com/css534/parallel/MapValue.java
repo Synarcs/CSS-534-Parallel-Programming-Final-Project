@@ -1,8 +1,5 @@
 package com.css534.parallel;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
 
 import org.apache.hadoop.io.Writable;
 
@@ -10,13 +7,19 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class MapValue implements Writable {
 
     private double distance;
     private int rowValue;
+    MapValue(double distance, int rowValue){ this.distance = distance; this.rowValue = rowValue;}
+
+    public double getDistance() {
+        return distance;
+    }
+
+    public int getRowValue() {
+        return rowValue;
+    }
 
     @Override
     public void write(DataOutput dataOutput) throws IOException {
