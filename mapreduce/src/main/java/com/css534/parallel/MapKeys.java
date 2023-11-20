@@ -1,7 +1,10 @@
 package com.css534.parallel;
 
+import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import org.apache.hadoop.io.WritableComparable;
 
 import java.io.DataInput;
@@ -11,11 +14,12 @@ import java.io.IOException;
 
 @Data
 @Builder
+@NoArgsConstructor
 public class MapKeys implements WritableComparable<MapKeys> {
 
     private String featureName;
     private int colValue;
-
+    // private int rowValue;
 
     @Override
     public int compareTo(MapKeys other) {
@@ -25,34 +29,30 @@ public class MapKeys implements WritableComparable<MapKeys> {
         int cmp = featureName.compareTo(other.featureName);
         if (cmp == 0) {
             cmp = Integer.compare(colValue, other.colValue);
-//            if (cmp == 0) {
-//                cmp = Integer.compare(rowValue, other.rowValue);
-//            }
         }
         return cmp;
     }
 
-    public MapKeys(String featureName, int colValue){
-//        this.rowValue = rowValue;
+    public MapKeys(String featureName ,int colValue){
         this.colValue = colValue;
         this.featureName = featureName;
     }
 
     /**
-            data serialization implementation
-            Mapper keys emit logic
-      */
+     data serialization implementation
+     Mapper keys emit logic
+     */
     @Override
     public void write(DataOutput dataOutput) throws IOException {
         dataOutput.writeUTF(featureName);
-//        dataOutput.writeInt(rowValue);
+        // dataOutput.writeInt(rowValue);
         dataOutput.writeInt(colValue);
     }
 
     @Override
     public void readFields(DataInput dataInput) throws IOException {
         featureName = dataInput.readUTF();
-//        rowValue = dataInput.readInt();
+        // rowValue = dataInput.readInt();
         colValue = dataInput.readInt();
     }
 }

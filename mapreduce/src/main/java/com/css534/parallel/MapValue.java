@@ -2,6 +2,8 @@ package com.css534.parallel;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
+import lombok.NoArgsConstructor;
+
 import org.apache.hadoop.io.Writable;
 
 import java.io.DataInput;
@@ -10,10 +12,11 @@ import java.io.IOException;
 
 @Data
 @AllArgsConstructor
+@NoArgsConstructor
 public class MapValue implements Writable {
 
-    private int rowValue;
     private double distance;
+    private int rowValue;
 
     @Override
     public void write(DataOutput dataOutput) throws IOException {
@@ -23,7 +26,7 @@ public class MapValue implements Writable {
 
     @Override
     public void readFields(DataInput dataInput) throws IOException {
-        rowValue = dataInput.readInt();
         distance = dataInput.readDouble();
+        rowValue = dataInput.readInt();
     }
 }

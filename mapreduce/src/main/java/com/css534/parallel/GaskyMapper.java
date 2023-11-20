@@ -1,6 +1,5 @@
 package com.css534.parallel;
 
-import org.apache.hadoop.io.DoubleWritable;
 import org.apache.hadoop.io.LongWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.MapReduceBase;
@@ -9,9 +8,9 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 
 public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, Text, MapKeys, MapValue> {
 
@@ -56,23 +55,35 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
     public void map(LongWritable longWritable, Text binaryImageRowInput, OutputCollector<MapKeys, MapValue> outputCollector, Reporter reporter) throws IOException {
         String inputFeatureMatrix = binaryImageRowInput.toString();
         String[] distFavArray = inputFeatureMatrix.split("\\s+");
-        if (distFavArray.length == 0) return;
+        if (distFavArray.length == 0) {
+            System.out.println("Error in reading the feature values please erify");
+            return;
+        }
 
         String facilityName = distFavArray[0];
         Integer matrixRowNumber = Integer.valueOf(distFavArray[1]);
         System.out.println("Processing the feature value as" + facilityName + " with the row number " + matrixRowNumber);
 
-        String[] binMatrixValues = Arrays.copyOfRange(distFavArray, 2, distFavArray.length);
+//        String[] binMatrixValues = Arrays.copyOfRange(distFavArray, 2, distFavArray.length);
+        String binMatrixValues = distFavArray[distFavArray.length - 1];
+        System.out.println("The Read binary Distance value is " + binMatrixValues);
 
-        List<Double> gridRows = Arrays.stream(binMatrixValues)
-                                      .map(Double::valueOf).toList();
+        List<Double> gridRows = new ArrayList<>();
+        for (int i=0 ; i < binMatrixValues.length(); i++)
+            gridRows.add(
+                    Double.valueOf(
+                            Character.getNumericValue(binMatrixValues.charAt(i))
+                    )
+            );
+
+        System.out.println("The facility doubl ematrix is " + gridRows);
 
         /*
             If the binary map array for a row has 0 values it means it has unfavourable facilites
             Else they are fav one's;
          */
-        double[] leftDistance = new double[distFavArray.length];
-        double[] rightDistance = new double[distFavArray.length];
+        double[] leftDistance = new double[gridRows.size()];
+        double[] rightDistance = new double[gridRows.size()];
 
         Arrays.fill(leftDistance, Double.MAX_VALUE);
         Arrays.fill(rightDistance, Double.MAX_VALUE);
@@ -87,7 +98,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
 
         for (int values = 0; values < leftDistance.length; values++){
             // keep the grid as 0 index based for each 1.... n
-            outputCollector.collect(new MapKeys(facilityName ,values + 1), new MapValue(matrixRowNumber,leftDistance[values]));
+            outputCollector.collect(new MapKeys(facilityName ,values + 1), new MapValue(leftDistance[values], matrixRowNumber));
         }
     }
 

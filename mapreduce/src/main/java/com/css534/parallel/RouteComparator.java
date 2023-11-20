@@ -21,9 +21,9 @@ public class RouteComparator extends WritableComparator {
         int cmp = key1.getFeatureName().compareTo(key2.getFeatureName());
         if (cmp == 0) {
             cmp = Integer.compare(key1.getColValue(), key2.getColValue());
-//            if (cmp == 0) {
-//                cmp = Integer.compare(key1.getRowValue(), key2.getRowValue());
-//            }
+            if (cmp == 0) {
+                //    cmp = Integer.compare(key1.getRowValue(), key2.getRowValue());
+            }
         }
         return cmp;
     }

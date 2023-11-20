@@ -12,7 +12,7 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 public class Vector2f {
 
-    private int xx;
-    private int yy;
+    private double xx;
+    private double yy;
 
 }
