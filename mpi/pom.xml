@@ -10,6 +10,13 @@
     </parent>
 
     <artifactId>mpi</artifactId>
+    <repositories>
+        <repository>
+            <id>my-repo</id>
+            <name>MPI repo</name>
+            <url>https://invesdwin.de/repo/invesdwin-oss/</url>
+        </repository>
+    </repositories>
 
     <properties>
         <maven.compiler.source>17</maven.compiler.source>
@@ -19,7 +26,14 @@
 
 
     <packaging>jar</packaging>
-
+    <dependencies>
+    <!-- https://mvnrepository.com/artifact/org.openmpi/mpi -->
+    <dependency>
+        <groupId>org.openmpi</groupId>
+        <artifactId>mpi</artifactId>
+        <version>4.1.4</version>
+    </dependency>
+    </dependencies>
     <build>
         <plugins>
             <plugin>
