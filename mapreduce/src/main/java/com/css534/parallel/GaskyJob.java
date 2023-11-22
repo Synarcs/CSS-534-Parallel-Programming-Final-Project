@@ -3,12 +3,16 @@ package com.css534.parallel;
 import org.apache.hadoop.fs.Path;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
+import org.apache.hadoop.mapred.jobcontrol.Job;
+import org.apache.hadoop.mapred.jobcontrol.JobControl;
 
 import java.io.IOException;
 import java.util.Arrays;
 
 public class GaskyJob {
     public static void main(String[] args) throws InterruptedException, IOException {
+
+        long time = System.currentTimeMillis();
 
         JobConf conf = new JobConf(GaskyJob.class);
 
@@ -32,7 +36,15 @@ public class GaskyJob {
         FileInputFormat.addInputPath(conf , new Path(args[0])); // for the record redear in mapper
         FileOutputFormat.setOutputPath(conf, new Path(args[1]));
 
+        JobControl control = new JobControl("Gasky Algorithm Computation");
+
+
         JobClient client = new JobClient();
+
+//        Job findReducedDistancesJob = new Job(conf);
         client.runJob(conf);
+
+
+        System.out.println("Elapsed Time :" + (System.currentTimeMillis() - time));
     }
 }

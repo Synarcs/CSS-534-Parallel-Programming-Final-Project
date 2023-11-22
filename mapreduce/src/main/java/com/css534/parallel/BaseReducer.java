@@ -24,19 +24,7 @@ public class BaseReducer extends MapReduceBase implements Reducer<MapKeys, MapVa
         return vector2F;
     }
 
-
     private Text keyText = new Text();
-    public void mrGaskyAlgorithm(){}
-
-    private int findProximityDistance(Double x1, Double y1, Double x2, Double y2){
-        return 0;
-    }
-
-    private int findProximityIntervalPoint(){ return 0; }
-
-    private double findEuclideanDistance(int x, int y, int x1, int y1){
-        return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
-    }
 
     public List<Map.Entry<Integer, Double>> getOrderedRowValues(Iterator<MapValue> valueIterator){
         // O(nlogn)
