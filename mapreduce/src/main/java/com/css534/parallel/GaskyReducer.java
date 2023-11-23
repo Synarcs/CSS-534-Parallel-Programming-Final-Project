@@ -95,7 +95,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
     private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(gridSize);
-        for (int i=0; i < gridSize; i++) distances.add(i, Double.MAX_VALUE);
 
         if (totalPoints > 2) {
             log.info("The current length of the un dominated grids is" + cartesianProjectPoints.size());
@@ -107,9 +106,8 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                 points.add(cartesianProjectPoints.get(i));
 
             // filtering the points based on the dominance to further calculate proximity distance
-            int currentLastVisitedNode = 2;
             int currentWindowStart = 1;
-            while (points.size() >= 3 && currentLastVisitedNode < cartesianProjectPoints.size()) {
+            while (points.size() >= 3 && currentWindowStart <= points.size() - 2) {
                 Vector2f ii = points.get(currentWindowStart - 1);
                 Vector2f jj = points.get(currentWindowStart);
                 Vector2f kk = points.get(currentWindowStart + 1);
@@ -121,10 +119,8 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                     if (xij > xjk) {
                         points.remove(currentWindowStart);
                         currentWindowStart++;
-                        currentLastVisitedNode++; // move the window to the right
                     } else {
                         currentWindowStart++;
-                        currentLastVisitedNode++;
                     }
                 }
             }
