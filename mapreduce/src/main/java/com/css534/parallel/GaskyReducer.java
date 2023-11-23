@@ -28,7 +28,36 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         return vector2F;
     }
 
-    private Deque<Vector2f> findProximityPoints(List<Vector2f> unDominatedPoints) {
+    private List<double[]> findProximityPoints(List<Vector2f> unDominatedPoints) {
+        List<Vector2f> intervals = new ArrayList<>();
+        for (int i=1; i < unDominatedPoints.size(); i++){
+            Vector2f point1 = unDominatedPoints.get(i-1);
+            Vector2f point2 = unDominatedPoints.get(i);
+            intervals.add(
+                    new Vector2f(
+                            (point1.getXx() + point2.getXx()) / 2,
+                            0 // point lying on with intersection on X axis
+                    )
+            );
+        }
+        // i can do it in O(1) space, lazy to do it lol
+        // implementation of combine intervals using a the interval frame
+        List<double[] > mergedInterval = new ArrayList<>(intervals.size());
+        mergedInterval.add(
+                new double[]{1, intervals.get(0).getXx()}
+        );
+        for (int i = 1; i < intervals.size(); i++){
+            mergedInterval.add(
+                    new double[]{intervals.get(i - 1).getXx(), intervals.get(i).getXx()}
+            );
+        }
+        mergedInterval.add(
+                new double[]{intervals.get(intervals.size() - 1).getXx(), gridSize}
+        );
+        return mergedInterval;
+    }
+
+    public Deque<Vector2f> findProximityPointsSingle(List<Vector2f> unDominatedPoints){
         Deque<Vector2f> intervals = new LinkedList<>();
         for (int i=1; i < unDominatedPoints.size(); i++){
             Vector2f point1 = unDominatedPoints.get(i-1);
@@ -40,7 +69,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                     )
             );
         }
-        return intervals;
+        return  intervals;
     }
 
     private double findEuclideanDistance(int x, int y, int x1, int y1){return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));}
@@ -63,17 +92,72 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         This will run for each column and determine the closest distance from skyline objects
         This will all return the final skyline objects if any
      */
-    private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException{
+    private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
+        List<Double> distances = new ArrayList<>(gridSize);
+        for (int i=0; i < gridSize; i++) distances.add(i, Double.MAX_VALUE);
 
-        if (totalPoints > 2){
+        if (totalPoints > 2) {
             log.info("The current length of the un dominated grids is" + cartesianProjectPoints.size());
             log.info("This is a non implemented method yet");
-            return new SkylineObjects();
+
+            List<Vector2f> points = new LinkedList<>();
+
+            for (int i = 0; i < cartesianProjectPoints.size(); i++)
+                points.add(cartesianProjectPoints.get(i));
+
+            // filtering the points based on the dominance to further calculate proximity distance
+            int currentLastVisitedNode = 2;
+            int currentWindowStart = 1;
+            while (points.size() >= 3 && currentLastVisitedNode < cartesianProjectPoints.size()) {
+                Vector2f ii = points.get(currentWindowStart - 1);
+                Vector2f jj = points.get(currentWindowStart);
+                Vector2f kk = points.get(currentWindowStart + 1);
+
+                if (ii != null && jj != null && kk != null) {
+                    double xij = calcBisectorProjections(ii.getXx(), ii.getYy(), jj.getXx(), jj.getYy()).getXx();
+                    double xjk = calcBisectorProjections(jj.getXx(), jj.getYy(), kk.getXx(), kk.getYy()).getXx();
+
+                    if (xij > xjk) {
+                        points.remove(currentWindowStart);
+                        currentWindowStart++;
+                        currentLastVisitedNode++; // move the window to the right
+                    } else {
+                        currentWindowStart++;
+                        currentLastVisitedNode++;
+                    }
+                }
+            }
+
+            log.info("The current remained dominated points are");
+            List<double[]> proximityProjectionsPoints = findProximityPoints(points);
+            int unDominatedPointsSize = points.size();
+            int proximityIntervals = proximityProjectionsPoints.size() - 1;
+            // // this will always be greater than 2 (since for this case we alwasy have more than 2 cartesian points in the grid).
+            assert  unDominatedPointsSize == proximityIntervals;
+            int dominatedCoordinatesDistances = 0;
+//          [ [1, 3.0] [3, 5.0] [5, 8]] || (2.0,3.0)(4.0,1.0)(6.0,6.0)
+
+            for (int interval=0; interval < proximityProjectionsPoints.size(); interval++){
+                double[] currentInterval = proximityProjectionsPoints.get(interval);
+                // we only consider the int projection over x asix for grid skyline
+                for (int i=(int) currentInterval[0]; i <= (int) currentInterval[1]; i++){
+                    distances.add(
+                            dominatedCoordinatesDistances,
+                            findEuclideanDistance(i, 0, points.get(dominatedCoordinatesDistances).getXx(), points.get(dominatedCoordinatesDistances).getYy())
+                    );
+                }
+                dominatedCoordinatesDistances++;
+            }
+
+            // check for the points based on the dominance
+            return new SkylineObjects(
+                    distances,
+                    points
+            );
         }
 
-        List<Double> distances = new ArrayList<>(gridSize);
-        Deque<Vector2f> proximityProjectionsPoints = findProximityPoints(cartesianProjectPoints);
+        Deque<Vector2f> proximityProjectionsPoints = findProximityPointsSingle(cartesianProjectPoints);
         if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1){
             // only one dominant point exist hence has no partitions present
             for (int i = 1; i <= gridSize; i++){
@@ -86,7 +170,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                     cartesianProjectPoints
             );
         }
-        else if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1) {
+        else if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 0) {
             // nothing is present all are dominated by each other
             double[] maxDistance = new double[gridSize];
             Arrays.fill(maxDistance, Double.MAX_VALUE);
@@ -103,13 +187,13 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         Vector2f intervalProjection = proximityProjectionsPoints.removeFirst();
         for (int i=1; i <= gridSize ; i++) {
             if (i ==  intervalProjection.getXx()){
-                    distances.add(
-                            i - 1,
-                            Double.min(
-                                    findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy()),
-                                    findEuclideanDistance(cartesianProjectPoints.get(1).getXx(), cartesianProjectPoints.get(1).getYy(), i, 0)
-                            )
-                    );
+                distances.add(
+                        i - 1,
+                        Double.min(
+                                findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy()),
+                                findEuclideanDistance(cartesianProjectPoints.get(1).getXx(), cartesianProjectPoints.get(1).getYy(), i, 0)
+                        )
+                );
             }else if (i < intervalProjection.getXx()){
                 distances.add(i - 1,
                         findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy())
