@@ -94,7 +94,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
      */
     private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
-        List<Double> distances = new ArrayList<>(gridSize);
+        List<Double> distances = new ArrayList<>(Collections.nCopies(8, Double.MAX_VALUE));
 
         if (totalPoints > 2) {
             log.info("The current length of the un dominated grids is" + cartesianProjectPoints.size());
@@ -127,6 +127,8 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
 
             log.info("The current remained dominated points are");
             List<double[]> proximityProjectionsPoints = findProximityPoints(points);
+            List<Double> testData = proximityProjectionsPoints.stream().map((i) -> i[0]).collect(Collectors.toList());
+
             int unDominatedPointsSize = points.size();
             int proximityIntervals = proximityProjectionsPoints.size() - 1;
             // // this will always be greater than 2 (since for this case we alwasy have more than 2 cartesian points in the grid).
@@ -136,12 +138,23 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
 
             for (int interval=0; interval < proximityProjectionsPoints.size(); interval++){
                 double[] currentInterval = proximityProjectionsPoints.get(interval);
+                int start = (int) currentInterval[0]; int end = (int) currentInterval[1];
+                Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);
                 // we only consider the int projection over x asix for grid skyline
-                for (int i=(int) currentInterval[0]; i <= (int) currentInterval[1]; i++){
-                    distances.add(
-                            dominatedCoordinatesDistances,
-                            findEuclideanDistance(i, 0, points.get(dominatedCoordinatesDistances).getXx(), points.get(dominatedCoordinatesDistances).getYy())
-                    );
+                for (int xCord=start; xCord <= end; xCord++){
+                    if (distances.get(xCord - 1) != Double.MAX_VALUE){
+                        distances.set(
+                                xCord - 1,
+                                Double.min(
+                                        findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()),
+                                        distances.get(xCord - 1)
+                                )
+                        );
+                    }else
+                        distances.set(
+                                xCord - 1,
+                                findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy())
+                        );
                 }
                 dominatedCoordinatesDistances++;
             }
@@ -157,7 +170,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1){
             // only one dominant point exist hence has no partitions present
             for (int i = 1; i <= gridSize; i++){
-                distances.add(i-1,
+                distances.set(i-1,
                         findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy())
                 );
             }
@@ -183,7 +196,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         Vector2f intervalProjection = proximityProjectionsPoints.removeFirst();
         for (int i=1; i <= gridSize ; i++) {
             if (i ==  intervalProjection.getXx()){
-                distances.add(
+                distances.set(
                         i - 1,
                         Double.min(
                                 findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy()),
@@ -191,11 +204,11 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                         )
                 );
             }else if (i < intervalProjection.getXx()){
-                distances.add(i - 1,
+                distances.set(i - 1,
                         findEuclideanDistance(i, 0, cartesianProjectPoints.get(0).getXx(), cartesianProjectPoints.get(0).getYy())
                 );
             }else if (i > intervalProjection.getXx()){
-                distances.add(i - 1,
+                distances.set(i - 1,
                         findEuclideanDistance(cartesianProjectPoints.get(1).getXx(), cartesianProjectPoints.get(1).getYy(), i, 0)
                 );
             }
