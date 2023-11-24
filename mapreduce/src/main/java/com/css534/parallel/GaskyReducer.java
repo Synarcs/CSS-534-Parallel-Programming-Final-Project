@@ -3,6 +3,7 @@ package com.css534.parallel;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
+import org.apache.hadoop.mapred.JobConf;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
@@ -19,6 +20,12 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
     private Integer gridSize = 0;
 
     private Log log = LogFactory.getLog(GaskyReducer.class);
+
+    @Override
+    public void configure(JobConf job) {
+        // TODO Auto-generated method stub
+        super.configure(job);
+    }
 
     private Vector2FProjections calcBisectorProjections(double x, double y , double x1, double y1){
         Vector2FProjections vector2F = new Vector2FProjections();
@@ -94,7 +101,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
      */
     private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
-        List<Double> distances = new ArrayList<>(Collections.nCopies(8, Double.MAX_VALUE));
+        List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
 
         if (totalPoints > 2) {
             log.info("The current length of the un dominated grids is" + cartesianProjectPoints.size());
@@ -227,8 +234,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         */
         List<Map.Entry<Integer, Double>> orderedMap = getOrderedRowValues(iterator);
         gridSize = orderedMap.size();
-        Set<Integer> vv = new HashSet<>();
-        vv.clear();
         StringBuilder info = new StringBuilder();
         /*
                 Cast the projection of these points onto the cartesian grid in the form of Vector2f
@@ -261,7 +266,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             totalDistances.append(objects.getDistances().get(i));
             totalDistances.append(" ");
         }
-        totalDistances.append("||");
+        totalDistances.append("|| ");
 
         int objectSize = objects.getSkylineObjects().size();
         totalDistances.append("[");
@@ -269,6 +274,8 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             totalDistances.append(
                     objects.getSkylineObjects().get(i).getXx() + "," + objects.getSkylineObjects().get(i).getYy()
             );
+            if (i != objectSize - 1)
+                totalDistances.append(",");
         }
         totalDistances.append("]");
 

@@ -82,8 +82,8 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
             If the binary map array for a row has 0 values it means it has unfavourable facilites
             Else they are fav one's;
          */
-        double[] leftDistance = new double[gridRows.size()];
-        double[] rightDistance = new double[gridRows.size()];
+        double[] leftDistance = new double[binMatrixValues.length()];
+        double[] rightDistance = new double[binMatrixValues.length()];
 
         Arrays.fill(leftDistance, Double.MAX_VALUE);
         Arrays.fill(rightDistance, Double.MAX_VALUE);
@@ -92,7 +92,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         rightDistance = getRightDistance(rightDistance, gridRows);
 
         // can also be implemented using a stack
-        for (int i=0; i < gridRows.size(); i++){
+        for (int i=0; i < binMatrixValues.length(); i++){
             leftDistance[i] = Double.min(leftDistance[i], rightDistance[i]);
         }
 
