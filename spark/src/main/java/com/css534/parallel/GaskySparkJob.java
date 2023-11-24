@@ -4,8 +4,10 @@ import org.apache.spark.api.java.JavaSparkContext;
 import scala.Tuple2;
 import org.apache.spark.SparkConf;
 
+import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Comparator;
 import java.util.Iterator;
 import java.util.List;
 
@@ -23,17 +25,25 @@ public class GaskySparkJob {
         inputData.foreach(line -> System.out.println(line));
 
         // Process the input data and create key-value pairs
-        JavaPairRDD<Tuple2<String, Integer>, Tuple2<Integer, Double>> result = inputData
-                .flatMapToPair(line -> parseInputData(line));   
+        JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>> result = inputData
+                .flatMapToPair(line -> parseInputData(line))
+                .groupByKey();
 
-        // Debug: Print the transformed data
-        System.out.println("Debug: Transformed Data:");
-        result.foreach(tuple -> System.out.println(tuple));
+        // Collect the result and sort it
+        List<Tuple2<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>>> resultList = result.collect();
 
-        // Collect the result and print or save it as needed
-        List<Tuple2<Tuple2<String, Integer>, Tuple2<Integer, Double>>> resultList = result.collect();
-        for (Tuple2<Tuple2<String, Integer>, Tuple2<Integer, Double>> tuple : resultList) {
-            System.out.println(tuple);
+        // Create a new list with the sorted elements
+        List<Tuple2<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>>> sortedResultList = new ArrayList<>(resultList);
+        sortedResultList.sort(Comparator.comparing(
+                (Tuple2<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>> tuple) -> tuple._1(),
+                Tuple2Comparator.INSTANCE
+        ));
+
+        // Print the sorted result
+        for (Tuple2<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>> tuple : sortedResultList) {
+            System.out.print(tuple._1()+" ");
+            tuple._2().forEach(value -> System.out.print("  " + value));
+            System.out.println("");
         }
 
         // Stop the Spark context
@@ -51,14 +61,8 @@ public class GaskySparkJob {
             String facilityName = distFavArray[0];
             int matrixRowNumber = Integer.parseInt(distFavArray[1]);
 
-            // Debug: Print facilityName and matrixRowNumber
-            System.out.println("Debug: FacilityName: " + facilityName + ", MatrixRowNumber: " + matrixRowNumber);
-
             // Convert the strings to a list of strings
             List<String> binMatrixValues = Arrays.asList(Arrays.copyOfRange(distFavArray, 2, distFavArray.length));
-
-            // Debug: Print binMatrixValues
-            System.out.println("Debug: binMatrixValues: " + binMatrixValues);
 
             double[] leftDistance = new double[binMatrixValues.get(0).length()];
             double[] rightDistance = new double[binMatrixValues.get(0).length()];
@@ -69,13 +73,9 @@ public class GaskySparkJob {
             leftDistance = getLeftDistance(leftDistance, binMatrixValues);
             rightDistance = getRightDistance(rightDistance, binMatrixValues);
 
-            // Debug: Print leftDistance and rightDistance
-            System.out.println("Debug: leftDistance: " + Arrays.toString(leftDistance));
-            System.out.println("Debug: rightDistance: " + Arrays.toString(rightDistance));
-
             for (int i = 0; i < binMatrixValues.get(0).length(); i++) {
                 result.add(new Tuple2<>(new Tuple2<>(facilityName, i + 1),
-                        new Tuple2<>(matrixRowNumber, Double.min(leftDistance[i],rightDistance[i]))));
+                        new Tuple2<>(matrixRowNumber, Double.min(leftDistance[i], rightDistance[i]))));
             }
         }
 
@@ -96,9 +96,6 @@ public class GaskySparkJob {
                 leftDistance[i] = leftDistance[i - 1] + 1;
             }
         }
-        // // Debug: Print leftDistance in the for loop
-        // System.out.println("Debug: LeftDistance in getLeftDistance:");
-        // System.out.println(Arrays.toString(leftDistance));
         return leftDistance;
     }
 
@@ -112,9 +109,21 @@ public class GaskySparkJob {
                 rightDistance[i] = rightDistance[i + 1] + 1;
             }
         }
-        //    // Debug: Print rightDistance in the for loop
-        // System.out.println("Debug: RightDistance in getRightDistance:");
-        // System.out.println(Arrays.toString(rightDistance));
         return rightDistance;
+    }
+
+    // Comparator for Tuple2<String, Integer>
+    static class Tuple2Comparator implements Comparator<Tuple2<String, Integer>>, Serializable {
+        static final Tuple2Comparator INSTANCE = new Tuple2Comparator();
+
+        @Override
+        public int compare(Tuple2<String, Integer> tuple1, Tuple2<String, Integer> tuple2) {
+            int compareResult = tuple1._1().compareTo(tuple2._1());
+            if (compareResult == 0) {
+                // If the first elements are equal, compare the second elements
+                compareResult = Integer.compare(tuple1._2(), tuple2._2());
+            }
+            return compareResult;
+        }
     }
 }
