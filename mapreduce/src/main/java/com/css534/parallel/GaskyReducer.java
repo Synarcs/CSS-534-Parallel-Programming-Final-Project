@@ -149,6 +149,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                                         findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()),
                                         distances.get(xCord - 1)
                                 )
+
                         );
                     }else
                         distances.set(
@@ -263,9 +264,14 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         }
         totalDistances.append("||");
 
-        for (int i=0; i < objects.getSkylineObjects().size(); i++){
-            totalDistances.append("(" + objects.getSkylineObjects().get(i).getXx() + "," + objects.getSkylineObjects().get(i).getYy() + ")");
+        int objectSize = objects.getSkylineObjects().size();
+        totalDistances.append("[");
+        for (int i=0; i < objectSize; i++){
+            totalDistances.append(
+                    objects.getSkylineObjects().get(i).getXx() + "," + objects.getSkylineObjects().get(i).getYy()
+            );
         }
+        totalDistances.append("]");
 
         outputCollector.collect(
                 new Text(String.valueOf(mapKeys.getFeatureName() + " " + mapKeys.getColValue())),
