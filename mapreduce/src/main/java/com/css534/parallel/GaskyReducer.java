@@ -149,7 +149,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                                         findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()),
                                         distances.get(xCord - 1)
                                 )
-
                         );
                     }else
                         distances.set(

@@ -20,10 +20,10 @@ import static com.css534.parallel.DelimeterRegexConsts.SKYLINE_OBJECTS_LOADER;
  *  Combines all the skyline objects for each each facility and emits
  *  The union is done for each column and then reducer will reduce to make sure we get global unique skyline objects
  */
-public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, Vector2f> {
+public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, Text, Text> {
     private Log log = LogFactory.getLog(UnionFacilityMapper.class);
     @Override
-    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<Text, Vector2f> outputCollector, Reporter reporter) throws IOException, ArrayIndexOutOfBoundsException {
+    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException, ArrayIndexOutOfBoundsException {
         try {
             String objectInfo = skylineObjectProjections.toString();
             String facilityName = objectInfo.split("\\s+")[0];
@@ -36,18 +36,13 @@ public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWri
 
                 String[] doubleValues = doubleArrayString.split(",");
 
-                double[] resultArray = Arrays.stream(doubleValues)
-                        .mapToDouble(Double::parseDouble)
-                        .toArray();
+                System.out.println("Extracted double array: " + Arrays.toString(doubleValues));
 
-                System.out.println("Extracted double array: " + Arrays.toString(resultArray));
-
-                for (int i=0; i < resultArray.length; i+=2){
+                for (int i=0; i < doubleValues.length; i+=2){
                     outputCollector.collect(
                             new Text(facilityName),
-                            new Vector2f(
-                                    resultArray[i],
-                                    resultArray[i+1]
+                            new Text(
+                                    Arrays.toString(doubleValues)
                             )
                     );
                 }
