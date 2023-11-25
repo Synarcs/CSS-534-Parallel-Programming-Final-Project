@@ -14,7 +14,7 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Te
     @Override
     public void reduce(Text facilityName, Iterator<Text> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
 
-        Set<Vector2f> uniqueLocalSkylineObjects = new HashSet<>();
+        Set<Vector2f> uniqueLocalSkylineObjects = new LinkedHashSet<>();
         StringBuilder ans = new StringBuilder();
         // // O(nlogn)
         while (iterator.hasNext()){

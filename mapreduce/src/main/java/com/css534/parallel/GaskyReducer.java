@@ -99,7 +99,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         This will run for each column and determine the closest distance from skyline objects
         This will all return the final skyline objects if any
      */
-    private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
+    private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, Integer colNumber) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
 
@@ -164,6 +164,12 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                         );
                 }
                 dominatedCoordinatesDistances++;
+            }
+
+            for (Vector2f point: points){
+                double y = point.getYy();
+                point.setXx(y); // recasting over the plane of grid that was initially projected over the plane
+                point.setYy(colNumber);
             }
 
             // check for the points based on the dominance
@@ -234,7 +240,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         */
         List<Map.Entry<Integer, Double>> orderedMap = getOrderedRowValues(iterator);
         gridSize = orderedMap.size();
-        StringBuilder info = new StringBuilder();
         /*
                 Cast the projection of these points onto the cartesian grid in the form of Vector2f
          */
@@ -244,7 +249,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                     value.getValue()
             );
         }).collect(Collectors.toList());
-
 
         /*
                Filter out the highly unfavourable facilities that are too far from the desired system
@@ -258,7 +262,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             Will hold all the required euclidean distance from the un dominated points to cartesian x axis grid
             All distance must be based on the proximity interval barrier across all set of points
         */
-        SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections);
+        SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections, mapKeys.getColValue());
 
         StringBuilder totalDistances = new StringBuilder();
 
