@@ -167,11 +167,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                 dominatedCoordinatesDistances++;
             }
 
-            for (Vector2f point: points){
-                double y = point.getYy();
-                point.setXx(y); // recasting over the plane of grid that was initially projected over the plane
-                point.setYy(colNumber);
-            }
 
             // check for the points based on the dominance
             return new SkylineObjects(
@@ -277,7 +272,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         totalDistances.append("[");
         for (int i=0; i < objectSize; i++){
             totalDistances.append(
-                    objects.getSkylineObjects().get(i).getXx() + "," + objects.getSkylineObjects().get(i).getYy()
+                    objects.getSkylineObjects().get(i).getXx() + "," + (double) mapKeys.getColValue()
             );
             if (i != objectSize - 1)
                 totalDistances.append(",");

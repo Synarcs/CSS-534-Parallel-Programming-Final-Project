@@ -30,33 +30,46 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<In
          int colNumber = facilityNameColumn.get();
          Set<Double> favourable = new HashSet<>();
          Set<Double> unfavourable = new HashSet<>();
-
          // later implement hadoop batch Processing
-        Pattern facilityTypeRegex = Pattern.compile(FACILITY_TYPE);
+
+         Map<Double, Integer> favColProjectionMap = new HashMap<>();
+         Map<Double, Integer> unFavCalProjectionMap = new HashMap<>();
+
+         Pattern facilityTypeRegex = Pattern.compile(FACILITY_TYPE);
 
          while (iterator.hasNext()) {
              String facilityType = iterator.next().getFacilityType();
              double xRowProjection = iterator.next().getxProjections();
              Matcher facilityTypeMatch = facilityTypeRegex.matcher(facilityType);
-             if (facilityTypeMatch.find()) {
-                 unfavourable.add(xRowProjection);
-             } else {
-                 favourable.add(xRowProjection);
+             if (facilityTypeMatch.find())
+                 unFavCalProjectionMap.put(xRowProjection, unFavCalProjectionMap.getOrDefault(xRowProjection, 0) + 1);
+             else
+                 favColProjectionMap.put(xRowProjection, favColProjectionMap.getOrDefault(xRowProjection, 0) + 1);
+         }
+
+         for (Double xCordProjection: favColProjectionMap.keySet()){
+             if (favColProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("favourableFacilitiesCount"))){
+                 favourable.add(xCordProjection);
+             }
+         }
+         for (Double xCordProjection: unFavCalProjectionMap.keySet()){
+             if (favColProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("unFavourableFacilitiesCount"))){
+                 unfavourable.add(xCordProjection);
              }
          }
 
          favourable.removeAll(unfavourable);
 
-        StringBuilder builder = new StringBuilder();
+         StringBuilder builder = new StringBuilder();
 
-        favourable.stream().forEach((value) -> {
+         favourable.stream().forEach((value) -> {
             builder.append(favourable + "," + colNumber);
             builder.append(",");
-        });
+         });
 
-        outputCollector.collect(
+         outputCollector.collect(
                 new Text(String.valueOf(colNumber)),
                 new Text(builder.toString())
-        );
+         );
     }
 }
