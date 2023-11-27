@@ -17,9 +17,10 @@ import com.google.common.collect.Iterables;
 import com.google.common.collect.Lists;
 
 public class GaskySparkJob {
+    private static final int GRID_SIZE = 8; 
     public static void main(String[] args) {
         // Create a Spark context
-        SparkConf conf = new SparkConf().setAppName("GaskySparkReducerJob");
+        SparkConf conf = new SparkConf().setAppName("GaskySparkJob");
         JavaSparkContext sparkContext = new JavaSparkContext(conf);
 
         // Load input data
@@ -70,42 +71,128 @@ public class GaskySparkJob {
         sparkContext.stop();
     }
 
-    // New method to apply gaskyAlgorithm to each tuple along with its corresponding key
-    private static void applyGaskyAlgorithm(JavaSparkContext sparkContext,List<Tuple2<String, Integer>> keysList, List<Iterable<Tuple2<Integer, Double>>> valuesList) {
-        System.out.println("valuesList size"+valuesList.size());
-        for (int i = 0; i < valuesList.size(); i++) {
-            Tuple2<String, Integer> keysTuple = keysList.get(i);
-            int colNumber = keysTuple._2(); 
-            Iterable<Tuple2<Integer, Double>> valuesTuple = valuesList.get(i);
-                    
-            
-            System.out.println("Column number"+colNumber);
+        private static void applyGaskyAlgorithm(JavaSparkContext sparkContext, List<Tuple2<String, Integer>> keysList, List<Iterable<Tuple2<Integer, Double>>> valuesList) {
+        System.out.println("valuesList size" + valuesList.size());
+
+        // Create JavaRDDs for keys and values
+        JavaRDD<Tuple2<String, Integer>> keysRDD = sparkContext.parallelize(keysList);
+        JavaRDD<Iterable<Tuple2<Integer, Double>>> valuesRDD = sparkContext.parallelize(valuesList);
+
+        // Zip the two RDDs to create a PairRDD
+        JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>> zippedRDD = keysRDD.zip(valuesRDD);
+
+        // Filter out points with Double.MAX_VALUE distance
+        JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Integer, Double>>> filteredRDD = zippedRDD.mapValues(values ->
+                filterUnfavorablePoints(values)
+        );
+
+        // Debug: Print the filtered points
+        System.out.println("Remaining Points after filtering:");
+        filteredRDD.collect().forEach(tuple -> {
+        Tuple2<String, Integer> keysTuple = tuple._1();
+        int colNumber = keysTuple._2();
+        Iterable<Tuple2<Integer, Double>> remainingPoints = tuple._2();
+        System.out.println("Column number: " + colNumber);
+        System.out.println("Remaining Points: " + remainingPoints);
+        }); 
+
+        // Apply gaskyAlgorithm to the remaining points
+        filteredRDD.foreach(tuple -> {
+            Tuple2<String, Integer> keysTuple = tuple._1();
+            int colNumber = keysTuple._2();
+            Iterable<Tuple2<Integer, Double>> remainingPoints = tuple._2();
+
+            System.out.println("Applying gaskyAlgorithm for Column number: " + colNumber);
             // Assuming gaskyAlgorithm takes an Iterable<Tuple2<Integer, Double>> and a Tuple2<String, Integer>
-            gaskyAlgorithm(sparkContext, valuesTuple, colNumber);
+            gaskyAlgorithm(remainingPoints, colNumber);
+        });
+    }
+
+    private static Iterable<Tuple2<Integer, Double>> filterUnfavorablePoints(Iterable<Tuple2<Integer, Double>> values) {
+        List<Tuple2<Integer, Double>> filteredValues = new ArrayList<>();
+        for (Tuple2<Integer, Double> value : values) {
+            if (!value._2().equals(Double.MAX_VALUE)) {
+                filteredValues.add(value);
+            }
+        }
+        return filteredValues;
+    }
+
+
+
+    private static void gaskyAlgorithm(Iterable<Tuple2<Integer, Double>> remainingPoints, int colNumber) {
+    int totalRemainingPoints = Iterables.size(remainingPoints);
+    List<Tuple2<Double, Double>> points = new ArrayList<>();
+
+    // Convert remainingPoints to Tuple2<Double, Double> objects
+    for (Tuple2<Integer, Double> point : remainingPoints) {
+        points.add(new Tuple2<>(point._1().doubleValue(), point._2()));
+    }
+
+    // Debug: Print initial points
+    System.out.println("Initial Points for Column number: " + colNumber);
+    points.forEach(System.out::println);
+
+    // Filtering based on dominance
+    int currentWindowStart = 1;
+    while (points.size() >= 3 && currentWindowStart <= points.size() - 2) {
+        Tuple2<Double, Double> ii = points.get(currentWindowStart - 1);
+        Tuple2<Double, Double> jj = points.get(currentWindowStart);
+        Tuple2<Double, Double> kk = points.get(currentWindowStart + 1);
+
+        if (ii != null && jj != null && kk != null) {
+            double xij = calcBisectorProjections(ii._1(), ii._2(), jj._1(), jj._2())._1();
+            double xjk = calcBisectorProjections(jj._1(), jj._2(), kk._1(), kk._2())._1();
+
+            // Debug: Print xij and xjk
+            System.out.println("xij: " + xij + ", xjk: " + xjk);
+
+            if (xij > xjk) {
+                // Debug: Print the removed point
+                System.out.println("Removed point: " + jj);
+
+                // Remove the middle point
+                points.remove(currentWindowStart);
+            } else {
+                // Move to the next window
+                currentWindowStart++;
+            }
         }
     }
 
-    private static void gaskyAlgorithm(JavaSparkContext sparkContext, Iterable<Tuple2<Integer, Double>> values, int colNumber) {
-    int totalPoints = Iterables.size(values);
-    List<Double> distances = new ArrayList<>(Collections.nCopies(totalPoints, Double.MAX_VALUE));
-    System.out.println("Total points in Cartesian: " + totalPoints);
+    // Debug: Print final points after filtering
+    System.out.println("Filtered Points after Gasky Algorithm for Column number: " + colNumber);
+    points.forEach(System.out::println);
 
-    if (totalPoints > 2) {
-        // Convert Iterable to a List
-        List<Tuple2<Integer, Double>> points = Lists.newArrayList(values);
+    // Call the method to find proximal points
+    List<double[]> proximalPoints = findProximityPoints(points, totalRemainingPoints, GRID_SIZE);
 
-        // Use Spark transformations to filter points based on dominance
-        JavaPairRDD<Integer, Double> filteredPointsRDD = sparkContext.parallelize(points)
-                .mapToPair(point -> new Tuple2<>(point._1().doubleValue(), calcBisectorProjections(point._1().doubleValue(), point._2())))
-                .reduceByKey((point1, point2) -> ((Double)point1) > ((Double)point2) ? point1 : point2)
-                .values();
+    // Debug: Print proximal points
+    System.out.println("Proximal Points for Column number: " + colNumber);
+    proximalPoints.forEach(point -> System.out.println(Arrays.toString(point)));
+}
 
-        // Collect the results back to the driver
-        List<Tuple2<Integer, Double>> filteredPoints = filteredPointsRDD.collect();
+    private static List<double[]> findProximityPoints(List<Tuple2<Double, Double>> unDominatedPoints, final int totalPoints, final int gridSize) {
+    List<Tuple2<Double, Double>> intervals = new ArrayList<>();
 
-        System.out.println("The current remained dominated points are " + filteredPoints.size());
-        List<double[]> proximityProjectionsPoints = findProximityPoints(sparkContext, Lists.newArrayList(filteredPoints), totalPoints);
+    // Calculate intervals based on the unDominatedPoints
+    for (int i = 1; i < unDominatedPoints.size(); i++) {
+        Tuple2<Double, Double> point1 = unDominatedPoints.get(i - 1);
+        Tuple2<Double, Double> point2 = unDominatedPoints.get(i);
+        intervals.add(new Tuple2<>((point1._1() + point2._1()) / 2, 0.0));
     }
+
+    // Combine intervals using a frame
+    List<double[]> mergedInterval = new ArrayList<>(intervals.size());
+    mergedInterval.add(new double[]{1, intervals.get(0)._1()});
+
+    for (int i = 1; i < intervals.size(); i++) {
+        mergedInterval.add(new double[]{intervals.get(i - 1)._1(), intervals.get(i)._1()});
+    }
+
+    mergedInterval.add(new double[]{intervals.get(intervals.size() - 1)._1(), GRID_SIZE});
+
+    return mergedInterval;
 }
 
 
@@ -187,50 +274,59 @@ public class GaskySparkJob {
     }
 
 
-    private static Tuple2<Double, Double> calcBisectorProjections(Double x1, Double y1){
-        double x = x1;
-        double y = y1;
-        double xx = ((y * y) - (y * y) + (x * x) - (x * x)) / (2 * (y - x));
+    
+    private static Tuple2<Double, Double> calcBisectorProjections(double x, double y, double x1, double y1) {
+        double xx = ((y1 * y1) - (y * y) + (x1 * x1) - (x * x)) / (2 * (x1 - x));
         double yy = 0;
         return new Tuple2<>(xx, yy);
     }
 
-    private static List<double[]> findProximityPoints(JavaSparkContext sparkContext,
-                                                  List<Tuple2<Double, Double>> unDominatedPoints,
-                                                  final int totalPoints) {
-    // Create a JavaRDD from the list of unDominatedPoints
-    JavaRDD<Tuple2<Double, Double>> unDominatedPointsRDD = sparkContext.parallelize(unDominatedPoints);
+//     private static List<double[]> findProximityPoints(JavaSparkContext sparkContext,
+//                                                   List<Tuple2<Double, Double>> unDominatedPoints,
+//                                                   final int totalPoints) {
+//     // Create a JavaRDD from the list of unDominatedPoints
+//     JavaRDD<Tuple2<Double, Double>> unDominatedPointsRDD = sparkContext.parallelize(unDominatedPoints);
 
-    // Calculate intervals between consecutive points
-    JavaRDD<Tuple2<Double, Double>> intervalsRDD = unDominatedPointsRDD
-            .zipWithIndex()
-            .filter(tuple -> tuple._2() > 0) // Exclude the first point
-            .map(tuple -> {
-                Tuple2<Double, Double> point1 = unDominatedPoints.get(tuple._2().intValue() - 1);
-                Tuple2<Double, Double> point2 = tuple._1();
+//     // Calculate intervals between consecutive points
+//     JavaRDD<Tuple2<Double, Double>> intervalsRDD = unDominatedPointsRDD
+//             .zipWithIndex()
+//             .filter(tuple -> tuple._2() > 0) // Exclude the first point
+//             .map(tuple -> {
+//                 Tuple2<Double, Double> point1 = unDominatedPoints.get(tuple._2().intValue() - 1);
+//                 Tuple2<Double, Double> point2 = tuple._1();
 
-                return new Tuple2<>(
-                        (point1._1() + point2._1()) / 2,
-                        0.0 // point lying on with intersection on X axis
-                );
-            });
+//                 return new Tuple2<>(
+//                         (point1._1() + point2._1()) / 2,
+//                         0.0 // point lying on with intersection on X axis
+//                 );
+//             });
 
-    // Combine intervals
-    JavaPairRDD<Double, Double> mergedIntervalRDD = intervalsRDD
-            .mapToPair(interval -> new Tuple2<>(interval._1(), interval._1()))
-            .reduceByKey((interval1, interval2) -> new Tuple2<>(interval1, interval2));
+//     // Combine intervals
+//     JavaPairRDD<Double, Double> mergedIntervalRDD = intervalsRDD
+//             .mapToPair(interval -> new Tuple2<>(interval._1(), interval._1()))
+//             .reduceByKey((interval1, interval2) -> new Tuple2<>(interval1, interval2));
 
-    // Collect the results back to the driver
-    List<Tuple2<Double, Double>> mergedIntervals = mergedIntervalRDD.collect();
+//     // Collect the results back to the driver
+//     List<Tuple2<Double, Double>> mergedIntervals = mergedIntervalRDD.collect();
 
-    // Convert List<Tuple2<Double, Double>> to List<double[]>
-    List<double[]> mergedIntervalList = new ArrayList<>();
-    for (Tuple2<Double, Double> interval : mergedIntervals) {
-        mergedIntervalList.add(new double[]{interval._1(), totalPoints});
+//     // Convert List<Tuple2<Double, Double>> to List<double[]>
+//     List<double[]> mergedIntervalList = new ArrayList<>();
+//     for (Tuple2<Double, Double> interval : mergedIntervals) {
+//         mergedIntervalList.add(new double[]{interval._1(), totalPoints});
+//     }
+
+//     return mergedIntervalList;
+// }
+
+// Add this method to your class
+private static <T> Iterable<T> iterableToJava(scala.collection.Iterable<T> scalaIterable) {
+    List<T> javaList = new ArrayList<>();
+    scala.collection.Iterator<T> scalaIterator = scalaIterable.iterator();
+    while (scalaIterator.hasNext()) {
+        javaList.add(scalaIterator.next());
     }
-
-    return mergedIntervalList;
+    return javaList;
 }
 
-
 }
+
