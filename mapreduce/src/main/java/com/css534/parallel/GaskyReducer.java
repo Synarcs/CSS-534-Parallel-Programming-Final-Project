@@ -13,6 +13,7 @@ import javax.sound.sampled.Line;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
@@ -143,7 +144,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             int dominatedCoordinatesDistances = 0;
 //          [ [1, 3.0] [3, 5.0] [5, 8]] || (2.0,3.0)(4.0,1.0)(6.0,6.0)
 
-            for (int interval=0; interval < proximityProjectionsPoints.size(); interval++){
+            for (int interval=0; interval < proximityProjectionsPoints.size(); ++interval){
                 double[] currentInterval = proximityProjectionsPoints.get(interval);
                 int start = (int) currentInterval[0]; int end = (int) currentInterval[1];
                 Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);

@@ -1,15 +1,22 @@
 package com.css534.parallel;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.io.Text;
-import org.apache.hadoop.mapred.MapReduceBase;
-import org.apache.hadoop.mapred.OutputCollector;
-import org.apache.hadoop.mapred.Reducer;
-import org.apache.hadoop.mapred.Reporter;
+import org.apache.hadoop.mapred.*;
 
 import java.io.IOException;
 import java.util.*;
 
 public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Text, Text, Text, Text> {
+    private JobConf conf;
+    private Log log = LogFactory.getLog(FacilityCombinerReducer.class);
+
+    @Override
+    public void configure(JobConf job) {
+        super.configure(job);
+        this.conf = job;
+    }
 
     @Override
     public void reduce(Text facilityName, Iterator<Text> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
