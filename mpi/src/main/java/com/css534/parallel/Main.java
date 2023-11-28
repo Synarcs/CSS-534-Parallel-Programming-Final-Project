@@ -1,6 +1,9 @@
+package com.css534.parallel;
+
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -11,6 +14,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
 
 import mpi.*;
 
@@ -185,7 +189,18 @@ class MRGASKYMPI {
             }
 
             System.out.println("The current remained dominated points are");
+
+            for (int i = 0; i < points.size(); i++) {
+                System.out.println(points.get(i).getXx() + " " + points.get(i).getYy());
+            }
+
             List<double[]> proximityProjectionsPoints = findProximityPoints(points, gridSize);
+
+            // print proximity projections points
+            System.out.println("The proximity projections points are");
+            for (int i = 0; i < proximityProjectionsPoints.size(); i++) {
+                System.out.println(proximityProjectionsPoints.get(i)[0] + " " + proximityProjectionsPoints.get(i)[1]);
+            }
 
             List<Double> testData = new ArrayList<>();
             for (double[] interval : proximityProjectionsPoints) {
@@ -205,6 +220,8 @@ class MRGASKYMPI {
                 int start = (int) currentInterval[0];
                 int end = (int) currentInterval[1];
                 Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);
+                // print dominant point
+                System.out.println("The dominant point is " + dominantPoint.getXx() + " " + dominantPoint.getYy());
 
                 // We only consider the int projection over x-axis for grid skyline
                 for (int xCord = start; xCord <= end; xCord++) {
@@ -219,6 +236,13 @@ class MRGASKYMPI {
                                 xCord - 1,
                                 findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()));
                 }
+
+                // print distances
+                System.out.println("The distances after " + interval + " iteration are");
+                for (int i = 0; i < distances.size(); i++) {
+                    System.out.println(distances.get(i));
+                }
+
                 dominatedCoordinatesDistances++;
             }
 
@@ -226,10 +250,15 @@ class MRGASKYMPI {
             return new SkylineObjects(
                     distances,
                     points);
+
         }
 
-        Deque<Vector2f> proximityProjectionsPoints = findProximityPointsSingle(cartesianProjectPoints);
-        if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1) {
+        System.out.println("The current length of the un dominated grids is less than 2: " + cartesianProjectPoints.size());
+
+        Deque<Vector2f> proximityProjectionsPoints =
+                findProximityPointsSingle(cartesianProjectPoints);
+        if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size()
+                == 1) {
             // Only one dominant point exists, hence has no partitions present
             for (int i = 1; i <= gridSize; i++) {
                 distances.set(i - 1,
@@ -239,7 +268,8 @@ class MRGASKYMPI {
             return new SkylineObjects(
                     distances,
                     cartesianProjectPoints);
-        } else if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 0) {
+        } else if (proximityProjectionsPoints.size() == 0 &&
+                cartesianProjectPoints.size() == 0) {
             // Nothing is present, all are dominated by each other
             double[] maxDistance = new double[gridSize];
             Arrays.fill(maxDistance, Double.MAX_VALUE);
@@ -251,6 +281,9 @@ class MRGASKYMPI {
 
             return new SkylineObjects(maxDistanceList, new ArrayList<>());
         }
+
+        System.out.println("dominated grids is = 2: " +
+                cartesianProjectPoints.size());
 
         /*
          * It has 2 dominated points in the grid and a single interval that is the
@@ -288,8 +321,8 @@ class MRGASKYMPI {
 
         // Iterate over the specified portion of FacilityGrid
         for (int row = 0; row < m; row++) {
-            double distance = FacilityGrid[(m - 1) - row][columnIndex];
-            orderedMap.add(new AbstractMap.SimpleEntry<>(row, distance));
+            double distance = FacilityGrid[row][columnIndex];
+            orderedMap.add(new AbstractMap.SimpleEntry<>(row +1, distance));
         }
 
         // Print the orderedMap before returning
@@ -332,16 +365,16 @@ class MRGASKYMPI {
 
         double[][][] FacilityGrid = new double[numberOfFacilities][m][n];
 
-        // FacilityGrid = initializeArray(numberOfFacilities, m, n);
         try {
             String filePath = "input.txt";
             FacilityGrid = initializeArray(numberOfFacilities, m, n, filePath);
 
-            System.out.println("Before MRGASKY on rank:" + rank + ":");
-            printArray(FacilityGrid, facilitiesPerRank, m, n);
+            // FacilityGrid = initializeArray(numberOfFacilities, m, n);
+
+            // System.out.println("Before MRGASKY on rank:" + rank + ":");
+            // printArray(FacilityGrid, facilitiesPerRank, m, n);
 
             // MRGASKY algorithm
-            // Step-1:Update distances using Euclidean distance by step-1 algorithm
             for (int facility = 0; facility < facilitiesPerRank; facility++) {
                 for (int row = 0; row < m; row++) {
                     // Step-1 Algorithm
