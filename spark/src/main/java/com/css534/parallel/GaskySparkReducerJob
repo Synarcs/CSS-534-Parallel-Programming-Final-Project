@@ -165,16 +165,64 @@ public class GaskySparkJob {
     points.forEach(System.out::println);
 
     // Call the method to find proximal points
-    List<double[]> proximalPoints = findProximityPoints(points, totalRemainingPoints, GRID_SIZE);
+    List<double[]> proximityProjectionsPoints = findProximityPoints(points, totalRemainingPoints, GRID_SIZE);
 
     // Debug: Print proximal points
     System.out.println("Proximal Points for Column number: " + colNumber);
-    proximalPoints.forEach(point -> System.out.println(Arrays.toString(point)));
+    proximityProjectionsPoints.forEach(point -> System.out.println(Arrays.toString(point)));
+
+    int unDominatedPointsSize = points.size();
+    int proximityIntervals = proximityProjectionsPoints.size() - 1;
+    int dominatedCoordinatesDistances = 0;
+    List<Double> distances = new ArrayList<>(Collections.nCopies(GRID_SIZE, Double.MAX_VALUE));
+    //update distance implementation
+    for (int interval = 0; interval < proximityIntervals; interval++) {
+            double[] currentInterval = proximityProjectionsPoints.get(interval);
+            Tuple2<Double,Double> dominantPoint = points.get(dominatedCoordinatesDistances);
+            int start = (int) currentInterval[0];
+            int end = (int) currentInterval[1];
+            for (int xCord = start; xCord <= end; xCord++) {
+            //     if (xCord >= 1 && xCord <= distances.size()) {
+            //         double currentDistance = distances.get(xCord - 1);
+            //         double newDistance = findEuclideanDistance(xCord, 0, currentInterval[2], currentInterval[3]);
+
+            //         if (currentDistance != Double.MAX_VALUE) {
+            //             newDistance = Math.min(newDistance, currentDistance);
+            //         }
+
+            //         distances.set(xCord - 1, newDistance);
+            //     }
+            // }
+
+            // dominatedCoordinatesDistances++;
+                    if (distances.get(xCord - 1) != Double.MAX_VALUE){
+                        distances.set(
+                                xCord - 1,
+                                Double.min(
+                                        findEuclideanDistance(xCord, 0, dominantPoint._1(), dominantPoint._2()),
+                                        distances.get(xCord - 1)
+                                )
+                        );
+                    }else
+                        distances.set(
+                                xCord - 1,
+                                findEuclideanDistance(xCord, 0, dominantPoint._1(), dominantPoint._2())
+                        );
+                }
+                dominatedCoordinatesDistances++;
+        }
+      
+     // Debug: Print updated distances
+        System.out.println("Updated Distances:");
+        distances.forEach(System.out::println);
+
+
 }
 
     private static List<double[]> findProximityPoints(List<Tuple2<Double, Double>> unDominatedPoints, final int totalPoints, final int gridSize) {
     List<Tuple2<Double, Double>> intervals = new ArrayList<>();
 
+    System.out.println("unDominatedPoints size: " + unDominatedPoints.size());
     // Calculate intervals based on the unDominatedPoints
     for (int i = 1; i < unDominatedPoints.size(); i++) {
         Tuple2<Double, Double> point1 = unDominatedPoints.get(i - 1);
@@ -195,6 +243,13 @@ public class GaskySparkJob {
     return mergedInterval;
 }
 
+    private static double findEuclideanDistance(int x, int y, int x1, int y1) {
+        return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
+    }
+
+    private static double findEuclideanDistance(double x, double y, double x1, double y1){
+        return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
+    }
 
     // FlatMap function to process input data and generate key-value pairs
     private static Iterator<Tuple2<Tuple2<String, Integer>, Tuple2<Integer, Double>>> parseInputData(String line) {
