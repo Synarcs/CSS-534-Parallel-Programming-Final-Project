@@ -154,10 +154,10 @@ class MRGASKYMPI {
             throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
-        // MRGASKYMPI instance = new MRGASKYMPI();
+
 
         if (totalPoints > 2) {
-            System.out.println("The current length of the un dominated grids is " + cartesianProjectPoints.size());
+
 
             List<Vector2f> points = new LinkedList<>();
 
@@ -188,19 +188,9 @@ class MRGASKYMPI {
                 }
             }
 
-            System.out.println("The current remained dominated points are");
-
-            for (int i = 0; i < points.size(); i++) {
-                System.out.println(points.get(i).getXx() + " " + points.get(i).getYy());
-            }
 
             List<double[]> proximityProjectionsPoints = findProximityPoints(points, gridSize);
 
-            // print proximity projections points
-            System.out.println("The proximity projections points are");
-            for (int i = 0; i < proximityProjectionsPoints.size(); i++) {
-                System.out.println(proximityProjectionsPoints.get(i)[0] + " " + proximityProjectionsPoints.get(i)[1]);
-            }
 
             List<Double> testData = new ArrayList<>();
             for (double[] interval : proximityProjectionsPoints) {
@@ -220,8 +210,7 @@ class MRGASKYMPI {
                 int start = (int) currentInterval[0];
                 int end = (int) currentInterval[1];
                 Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);
-                // print dominant point
-                System.out.println("The dominant point is " + dominantPoint.getXx() + " " + dominantPoint.getYy());
+
 
                 // We only consider the int projection over x-axis for grid skyline
                 for (int xCord = start; xCord <= end; xCord++) {
@@ -237,11 +226,7 @@ class MRGASKYMPI {
                                 findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()));
                 }
 
-                // print distances
-                System.out.println("The distances after " + interval + " iteration are");
-                for (int i = 0; i < distances.size(); i++) {
-                    System.out.println(distances.get(i));
-                }
+
 
                 dominatedCoordinatesDistances++;
             }
@@ -253,12 +238,9 @@ class MRGASKYMPI {
 
         }
 
-        System.out.println("The current length of the un dominated grids is less than 2: " + cartesianProjectPoints.size());
 
-        Deque<Vector2f> proximityProjectionsPoints =
-                findProximityPointsSingle(cartesianProjectPoints);
-        if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size()
-                == 1) {
+        Deque<Vector2f> proximityProjectionsPoints = findProximityPointsSingle(cartesianProjectPoints);
+        if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1) {
             // Only one dominant point exists, hence has no partitions present
             for (int i = 1; i <= gridSize; i++) {
                 distances.set(i - 1,
@@ -282,8 +264,6 @@ class MRGASKYMPI {
             return new SkylineObjects(maxDistanceList, new ArrayList<>());
         }
 
-        System.out.println("dominated grids is = 2: " +
-                cartesianProjectPoints.size());
 
         /*
          * It has 2 dominated points in the grid and a single interval that is the
@@ -322,11 +302,9 @@ class MRGASKYMPI {
         // Iterate over the specified portion of FacilityGrid
         for (int row = 0; row < m; row++) {
             double distance = FacilityGrid[row][columnIndex];
-            orderedMap.add(new AbstractMap.SimpleEntry<>(row +1, distance));
+            orderedMap.add(new AbstractMap.SimpleEntry<>(row + 1, distance));
         }
 
-        // Print the orderedMap before returning
-        System.out.println("Ordered Map on rank " + rank + ", column: " + columnIndex + ": " + orderedMap);
         return orderedMap;
     }
 
@@ -334,6 +312,8 @@ class MRGASKYMPI {
         MPI.Init(args);
         int rank = MPI.COMM_WORLD.Rank();
         int size = MPI.COMM_WORLD.Size();
+
+        long startTime = System.currentTimeMillis();
 
         if (rank == 0 && args.length != 3) {
             System.err.println("Usage: java MRGASKYMPI <numberOfFacilities> size size");
@@ -357,22 +337,19 @@ class MRGASKYMPI {
         System.out.println("rank:" + rank + " , numberOfFacilities:" + numberOfFacilities);
         System.out.println("rank:" + rank + " , m:" + m);
         System.out.println("rank:" + rank + " , n:" + n);
+        System.out.println("rank:" + rank + " , size:" + size);
 
         int facilitiesPerRank = numberOfFacilities / size;
         int startIndex = rank * facilitiesPerRank;
         int endindex = startIndex + facilitiesPerRank;
         int remainder = m % size;
 
-        double[][][] FacilityGrid = new double[numberOfFacilities][m][n];
+        double[][][] FacilityGrid = new double[facilitiesPerRank][m][n];
 
         try {
             String filePath = "input.txt";
-            FacilityGrid = initializeArray(numberOfFacilities, m, n, filePath);
+            FacilityGrid = initializeArray(facilitiesPerRank, m, n, rank, filePath);
 
-            // FacilityGrid = initializeArray(numberOfFacilities, m, n);
-
-            // System.out.println("Before MRGASKY on rank:" + rank + ":");
-            // printArray(FacilityGrid, facilitiesPerRank, m, n);
 
             // MRGASKY algorithm
             for (int facility = 0; facility < facilitiesPerRank; facility++) {
@@ -392,9 +369,6 @@ class MRGASKYMPI {
                 }
             }
 
-            // System.out.println("After MRGASKY on rank:" + rank + ":");
-            // printArray(FacilityGrid, facilitiesPerRank, m, n);
-
             // Step-2 Algorithm
             for (int facility = 0; facility < facilitiesPerRank; facility++) {
                 for (int column = 0; column < n; column++) {
@@ -405,7 +379,6 @@ class MRGASKYMPI {
 
                     int gridSize = orderedMap.size();
 
-                    // System.out.println("Grid size on rank " + rank + ": " + gridSize);
 
                     // Create a list to store Vector2f objects
                     List<Vector2f> cartesianProjections = new ArrayList<>();
@@ -415,7 +388,6 @@ class MRGASKYMPI {
                         int key = value.getKey();
                         double val = value.getValue();
 
-                        System.out.println("Key: " + key + ", Value: " + val);
                         Vector2f vector = new Vector2f(key, val);
                         cartesianProjections.add(vector);
                     }
@@ -432,12 +404,6 @@ class MRGASKYMPI {
 
                     // Replace the original list with the filtered one
                     cartesianProjections = filteredCartesianProjections;
-
-                    // Print cartesianProjections
-                    System.out.println("Cartesian Projections on rank " + rank + ":");
-                    for (Vector2f vector : cartesianProjections) {
-                        System.out.println("X: " + vector.getXx() + ", Y: " + vector.getYy());
-                    }
 
                     // Calculate skyline objects for this rank
                     SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections, gridSize);
@@ -462,8 +428,11 @@ class MRGASKYMPI {
 
                 }
             }
-            System.out.println("After MRGASKY on rank:" + rank + ":");
-            printArray(FacilityGrid, facilitiesPerRank, m, n);
+
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
+            System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
+
         } catch (IOException e) {
             e.printStackTrace();
         } finally {
@@ -490,9 +459,9 @@ class MRGASKYMPI {
         return facilityGrid;
     }
 
-    private static double[][][] initializeArray(int numberOfFacilities, int m, int n, String filePath)
+    private static double[][][] initializeArray(int facilitiesPerRank, int m, int n, int r, String filePath)
             throws IOException {
-        double[][][] facilityGrid = new double[numberOfFacilities][m][n];
+        double[][][] facilityGrid = new double[facilitiesPerRank][m][n];
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -514,8 +483,15 @@ class MRGASKYMPI {
 
                 // Populate the facilityGrid array
                 int facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1; // Adjusted for 0-based indexing
-                for (int j = 0; j < n; j++) {
-                    facilityGrid[facilityIndex][row][j] = rowValues[j];
+                int belongToRank = facilityIndex / facilitiesPerRank;
+                int index = facilityIndex % facilitiesPerRank;
+
+
+                if (belongToRank == r) {
+
+                    for (int j = 0; j < n; j++) {
+                        facilityGrid[index][row][j] = rowValues[j];
+                    }
                 }
             }
         }
@@ -557,19 +533,6 @@ class MRGASKYMPI {
             dist_right_left[col] = dist;
         }
         return dist_right_left;
-    }
-
-    private static void printArray(double[][][] facilityGrid, int numberOfFacilities, int m, int n) {
-        for (int facility = 0; facility < numberOfFacilities; facility++) {
-            System.out.println("Facility " + facility + ":");
-            for (int i = 0; i < m; i++) {
-                for (int j = 0; j < n; j++) {
-                    System.out.print(facilityGrid[facility][i][j] + " ");
-                }
-                System.out.println();
-            }
-            System.out.println();
-        }
     }
 
 }
