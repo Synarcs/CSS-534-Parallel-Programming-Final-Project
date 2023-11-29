@@ -11,7 +11,8 @@ public class MapValue implements Writable {
 
     private double distance;
     private int rowValue;
-    MapValue(double distance, int rowValue){ this.distance = distance; this.rowValue = rowValue;}
+    public MapValue(){}
+    public MapValue(double distance, int rowValue){ this.distance = distance; this.rowValue = rowValue;}
 
     public double getDistance() {
         return distance;

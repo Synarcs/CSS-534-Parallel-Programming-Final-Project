@@ -47,7 +47,6 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         return rightDistance;
     }
 
-    // TODO: 16/11/23  need to add the feature implementation with feature type provided as input
     /*
         No implicit representation for the un fav types since they are implicitly present in map array
      */

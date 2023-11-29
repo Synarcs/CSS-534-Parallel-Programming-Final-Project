@@ -22,6 +22,8 @@ public class MapKeys implements WritableComparable<MapKeys> {
         return featureName;
     }
 
+    public MapKeys(){}
+
     @Override
     public int compareTo(MapKeys other) {
         // we need to compare the row value since the column will decide which parition to select

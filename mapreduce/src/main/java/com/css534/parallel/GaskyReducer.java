@@ -13,6 +13,7 @@ import javax.sound.sampled.Line;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
+import java.util.stream.Stream;
 
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
@@ -20,11 +21,13 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
     private Integer gridSize = 0;
 
     private Log log = LogFactory.getLog(GaskyReducer.class);
+    private JobConf conf;
 
     @Override
     public void configure(JobConf job) {
         // TODO Auto-generated method stub
         super.configure(job);
+        this.conf = job;
     }
 
     private Vector2FProjections calcBisectorProjections(double x, double y , double x1, double y1){
@@ -143,7 +146,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             int dominatedCoordinatesDistances = 0;
 //          [ [1, 3.0] [3, 5.0] [5, 8]] || (2.0,3.0)(4.0,1.0)(6.0,6.0)
 
-            for (int interval=0; interval < proximityProjectionsPoints.size(); interval++){
+            for (int interval=0; interval < proximityProjectionsPoints.size(); ++interval){
                 double[] currentInterval = proximityProjectionsPoints.get(interval);
                 int start = (int) currentInterval[0]; int end = (int) currentInterval[1];
                 Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);
@@ -166,11 +169,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
                 dominatedCoordinatesDistances++;
             }
 
-            for (Vector2f point: points){
-                double y = point.getYy();
-                point.setXx(y); // recasting over the plane of grid that was initially projected over the plane
-                point.setYy(colNumber);
-            }
 
             // check for the points based on the dominance
             return new SkylineObjects(
@@ -266,17 +264,20 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
 
         StringBuilder totalDistances = new StringBuilder();
 
+//        if (this.conf.get("includeDistance").equals("true")){
         for (int i=0; i < objects.getDistances().size(); i++){
             totalDistances.append(objects.getDistances().get(i));
             totalDistances.append(" ");
         }
+//        }
+
         totalDistances.append("|| ");
 
         int objectSize = objects.getSkylineObjects().size();
         totalDistances.append("[");
         for (int i=0; i < objectSize; i++){
             totalDistances.append(
-                    objects.getSkylineObjects().get(i).getXx() + "," + objects.getSkylineObjects().get(i).getYy()
+                    objects.getSkylineObjects().get(i).getXx()
             );
             if (i != objectSize - 1)
                 totalDistances.append(",");
@@ -284,7 +285,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         totalDistances.append("]");
 
         outputCollector.collect(
-                new Text(String.valueOf(mapKeys.getFeatureName() + " " + mapKeys.getColValue())),
+                new Text(mapKeys.getFeatureName() + " " + mapKeys.getColValue()),
                 new Text(totalDistances.toString())
         );
     }
