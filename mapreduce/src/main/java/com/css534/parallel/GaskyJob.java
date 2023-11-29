@@ -19,7 +19,12 @@ public class GaskyJob {
 
     private static Log logger = LogFactory.getLog(GaskyJob.class);
 
-
+    private static JobConf configureJobConf(JobConf conf,String[] args) {
+        conf.set("favourableFacilitiesCount", args[0]);
+        conf.set("unFavourableFacilitiesCount", args[1]);
+        conf.set("includeDistance", args[2]);
+        return conf;
+    }
 
     public static void main(String[] args) throws InterruptedException, IOException {
 
@@ -29,6 +34,9 @@ public class GaskyJob {
 
         String favourableFacilitiesCount = args[2];
         String unFavourableFacilitiesCount = args[3];
+        String includeDistance = args[4]; // true or false;
+
+        String[] extraConfig = {favourableFacilitiesCount, unFavourableFacilitiesCount, includeDistance};
 
         conf.setJobName("Gasky Index");
         conf.setMapperClass(GaskyMapper.class);
@@ -45,9 +53,10 @@ public class GaskyJob {
         System.out.println(Arrays.toString(args));
         FileInputFormat.addInputPath(conf , new Path(args[0])); // for the record redear in mapper
         FileOutputFormat.setOutputPath(conf, new Path(args[1]));
+        conf = configureJobConf(conf, extraConfig);
+
         JobClient client = new JobClient();
-        conf.set("favourableFacilitiesCount", favourableFacilitiesCount);
-        conf.set("unFavourableFacilitiesCount", unFavourableFacilitiesCount);
+
 
         RunningJob job = client.runJob(conf);
 
@@ -72,8 +81,7 @@ public class GaskyJob {
         conf2.setOutputFormat(TextOutputFormat.class);
         FileInputFormat.addInputPath(conf2, new Path(args[1]));
         FileOutputFormat.setOutputPath(conf2, new Path(args[1]));
-        conf2.set("favourableFacilitiesCount", favourableFacilitiesCount);
-        conf2.set("unFavourableFacilitiesCount", unFavourableFacilitiesCount);
+        conf2 = configureJobConf(conf2, extraConfig);
 
         RunningJob job2Status = client.runJob(conf2);
 

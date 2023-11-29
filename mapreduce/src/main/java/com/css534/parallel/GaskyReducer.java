@@ -21,11 +21,13 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
     private Integer gridSize = 0;
 
     private Log log = LogFactory.getLog(GaskyReducer.class);
+    private JobConf conf;
 
     @Override
     public void configure(JobConf job) {
         // TODO Auto-generated method stub
         super.configure(job);
+        this.conf = job;
     }
 
     private Vector2FProjections calcBisectorProjections(double x, double y , double x1, double y1){
@@ -100,6 +102,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         This will run for each column and determine the closest distance from skyline objects
         This will all return the final skyline objects if any
      */
+    @SuppressWarnings("unused")
     private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, Integer colNumber) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
@@ -262,17 +265,20 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
 
         StringBuilder totalDistances = new StringBuilder();
 
-        for (int i=0; i < objects.getDistances().size(); i++){
-            totalDistances.append(objects.getDistances().get(i));
-            totalDistances.append(" ");
-        }
+//        if (this.conf.get("includeDistance").equals("true")){
+            for (int i=0; i < objects.getDistances().size(); i++){
+                totalDistances.append(objects.getDistances().get(i));
+                totalDistances.append(" ");
+            }
+//        }
+
         totalDistances.append("|| ");
 
         int objectSize = objects.getSkylineObjects().size();
         totalDistances.append("[");
         for (int i=0; i < objectSize; i++){
             totalDistances.append(
-                    objects.getSkylineObjects().get(i).getXx() + "," + (double) mapKeys.getColValue()
+                    objects.getSkylineObjects().get(i).getXx()
             );
             if (i != objectSize - 1)
                 totalDistances.append(",");
@@ -280,7 +286,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         totalDistances.append("]");
 
         outputCollector.collect(
-                new Text(String.valueOf(mapKeys.getFeatureName() + " " + mapKeys.getColValue())),
+                new Text(mapKeys.getFeatureName() + " " + mapKeys.getColValue()),
                 new Text(totalDistances.toString())
         );
     }

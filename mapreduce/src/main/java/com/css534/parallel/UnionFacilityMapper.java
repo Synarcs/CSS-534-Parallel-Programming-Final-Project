@@ -44,20 +44,14 @@ public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWri
                 String doubleArrayString = matcher.group(1);
 
                 String[] doubleValues = doubleArrayString.split(",");
-                // the values are of the format [x1, y, x2, y, x3, y];
+                // the values are of the format [x1, x2, x3, x4 ... xn];
                 if (doubleValues.length == 0) return;
 
                 List<Double> xProjectiosn = Arrays.stream(doubleValues)
                                 .mapToDouble(Double::parseDouble)
                                 .boxed().collect(Collectors.toList());
 
-                xProjectiosn =  IntStream.range(0, xProjectiosn.size())
-                                .filter(i -> i % 2 == 0)
-                                .mapToObj(xProjectiosn::get)
-                                .collect(Collectors.toList());
-
                 int columnProjection = Integer.parseInt(objectInfo.split("\\s+")[1]);
-
 
 //                log.info("Extracted double array: " + Arrays.toString(doubleValues));
 

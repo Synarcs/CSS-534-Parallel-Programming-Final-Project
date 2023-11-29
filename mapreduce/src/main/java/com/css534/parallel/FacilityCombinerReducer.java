@@ -25,6 +25,7 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<In
 
 
     @Override
+    @SuppressWarnings("unused")
     public void reduce(IntWritable facilityNameColumn, Iterator<GlobalSkylineObjects> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
 
          int colNumber = facilityNameColumn.get();
@@ -37,6 +38,7 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<In
 
          Pattern facilityTypeRegex = Pattern.compile(FACILITY_TYPE);
 
+         // for faster performance consideration later batch segmentation of data can be used.
          while (iterator.hasNext()) {
              String facilityType = iterator.next().getFacilityType();
              double xRowProjection = iterator.next().getxProjections();
@@ -53,7 +55,7 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<In
              }
          }
          for (Double xCordProjection: unFavCalProjectionMap.keySet()){
-             if (favColProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("unFavourableFacilitiesCount"))){
+             if (unFavCalProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("unFavourableFacilitiesCount"))) {
                  unfavourable.add(xCordProjection);
              }
          }
