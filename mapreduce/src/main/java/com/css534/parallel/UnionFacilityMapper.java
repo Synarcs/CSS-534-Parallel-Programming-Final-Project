@@ -24,21 +24,20 @@ import static com.css534.parallel.DelimeterRegexConsts.*;
  *  Combines all the skyline objects for each each facility and emits
  *  The union is done for each column and then reducer will reduce to make sure we get global unique skyline objects
  */
-public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, IntWritable, GlobalSkylineObjects> {
+public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, IntWritable, Text> {
     private Log log = LogFactory.getLog(UnionFacilityMapper.class);
     @Override
-    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<IntWritable, GlobalSkylineObjects> outputCollector, Reporter reporter) throws IOException, ArrayIndexOutOfBoundsException {
+    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<IntWritable, Text> outputCollector, Reporter reporter) throws IOException, ArrayIndexOutOfBoundsException {
         try {
             String objectInfo = skylineObjectProjections.toString();
-            String facilityName = objectInfo.split("\\s+")[0];
+            String[] dataSplit =  objectInfo.split("\\s+");
+
+            String facilityName = dataSplit[0];
 
             Pattern regex = Pattern.compile(SKYLINE_OBJECTS_LOADER);
-            Pattern facilityTypeRegex = Pattern.compile(FACILITY_TYPE);
-
             Matcher matcher = regex.matcher(objectInfo);
-            Matcher facilityType = facilityTypeRegex.matcher(facilityName);
 
-            boolean isUnfavorableFacility = facilityType.find();
+            boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
 
             if (matcher.find()) {
                 String doubleArrayString = matcher.group(1);
@@ -48,24 +47,23 @@ public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWri
                 if (doubleValues.length == 0) return;
 
                 List<Double> xProjectiosn = Arrays.stream(doubleValues)
-                                .mapToDouble(Double::parseDouble)
-                                .boxed().collect(Collectors.toList());
+                        .mapToDouble(Double::parseDouble)
+                        .boxed().collect(Collectors.toList());
 
-                int columnProjection = Integer.parseInt(objectInfo.split("\\s+")[1]);
+                int columnProjection = Integer.parseInt(dataSplit[1]);
 
 //                log.info("Extracted double array: " + Arrays.toString(doubleValues));
 
                 for (int i=0; i < xProjectiosn.size(); i++){
                     outputCollector.collect(
                             new IntWritable(columnProjection),
-                            new GlobalSkylineObjects(
-                                    isUnfavorableFacility ? FAVOURABLE_POSITION : UNFAVOURABLE_POSITION,
-                                    xProjectiosn.get(i)
+                            new Text(
+                                    isUnfavorableFacility ? UNFAVOURABLE_POSITION : FAVOURABLE_POSITION + " " + xProjectiosn.get(i)
                             )
                     );
                 }
             } else {
-                log.info("No match found.");
+                log.error("No match found.");
                 return;
             }
         }catch (ArrayIndexOutOfBoundsException exception){

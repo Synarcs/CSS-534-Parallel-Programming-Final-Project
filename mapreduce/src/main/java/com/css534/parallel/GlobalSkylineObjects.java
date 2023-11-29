@@ -7,7 +7,7 @@ import java.io.DataOutput;
 import java.io.IOException;
 import java.io.Serializable;
 
-public class GlobalSkylineObjects implements Writable, Serializable {
+public class GlobalSkylineObjects implements Writable {
 
     private String facilityType;
     private double xProjections;
@@ -19,6 +19,8 @@ public class GlobalSkylineObjects implements Writable, Serializable {
     public String getFacilityType() {
         return facilityType;
     }
+
+    public GlobalSkylineObjects(){}
 
     public GlobalSkylineObjects(String facilityType, double xProjections){
         this.facilityType = facilityType;

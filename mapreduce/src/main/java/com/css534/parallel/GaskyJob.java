@@ -19,12 +19,6 @@ public class GaskyJob {
 
     private static Log logger = LogFactory.getLog(GaskyJob.class);
 
-    private static JobConf configureJobConf(JobConf conf,String[] args) {
-        conf.set("favourableFacilitiesCount", args[0]);
-        conf.set("unFavourableFacilitiesCount", args[1]);
-        conf.set("includeDistance", args[2]);
-        return conf;
-    }
 
     public static void main(String[] args) throws InterruptedException, IOException {
 
@@ -32,9 +26,9 @@ public class GaskyJob {
 
         JobConf conf = new JobConf(GaskyJob.class);
 
-        String favourableFacilitiesCount = args[2];
-        String unFavourableFacilitiesCount = args[3];
-        String includeDistance = args[4]; // true or false;
+        String favourableFacilitiesCount = args[3];
+        String unFavourableFacilitiesCount = args[4];
+        String includeDistance = args[5]; // true or false;
 
         String[] extraConfig = {favourableFacilitiesCount, unFavourableFacilitiesCount, includeDistance};
 
@@ -53,7 +47,9 @@ public class GaskyJob {
         System.out.println(Arrays.toString(args));
         FileInputFormat.addInputPath(conf , new Path(args[0])); // for the record redear in mapper
         FileOutputFormat.setOutputPath(conf, new Path(args[1]));
-        conf = configureJobConf(conf, extraConfig);
+        conf.set("favourableFacilitiesCount", extraConfig[0]);
+        conf.set("unFavourableFacilitiesCount", extraConfig[1]);
+        conf.set("includeDistance", extraConfig[2]);
 
         JobClient client = new JobClient();
 
@@ -74,16 +70,18 @@ public class GaskyJob {
         conf2.setMapperClass(UnionFacilityMapper.class);
         conf2.setReducerClass(FacilityCombinerReducer.class);
         conf2.setMapOutputKeyClass(IntWritable.class);
-        conf2.setMapOutputValueClass(GlobalSkylineObjects.class);
+        conf2.setMapOutputValueClass(Text.class);
         conf2.setOutputKeyClass(Text.class);
         conf2.setOutputValueClass(Text.class);
         conf2.setInputFormat(TextInputFormat.class);
         conf2.setOutputFormat(TextOutputFormat.class);
         FileInputFormat.addInputPath(conf2, new Path(args[1]));
-        FileOutputFormat.setOutputPath(conf2, new Path(args[1]));
-        conf2 = configureJobConf(conf2, extraConfig);
+        FileOutputFormat.setOutputPath(conf2, new Path(args[2]));
+        conf2.set("favourableFacilitiesCount", extraConfig[0]);
+        conf2.set("unFavourableFacilitiesCount", extraConfig[1]);
+        conf2.set("includeDistance", extraConfig[2]);
 
-        RunningJob job2Status = client.runJob(conf2);
+        client.runJob(conf2);
 
         System.out.println("Elapsed Time :" + (System.currentTimeMillis() - time));
     }

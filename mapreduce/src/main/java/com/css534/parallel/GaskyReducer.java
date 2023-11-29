@@ -102,7 +102,6 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         This will run for each column and determine the closest distance from skyline objects
         This will all return the final skyline objects if any
      */
-    @SuppressWarnings("unused")
     private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, Integer colNumber) throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
@@ -266,10 +265,10 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         StringBuilder totalDistances = new StringBuilder();
 
 //        if (this.conf.get("includeDistance").equals("true")){
-            for (int i=0; i < objects.getDistances().size(); i++){
-                totalDistances.append(objects.getDistances().get(i));
-                totalDistances.append(" ");
-            }
+        for (int i=0; i < objects.getDistances().size(); i++){
+            totalDistances.append(objects.getDistances().get(i));
+            totalDistances.append(" ");
+        }
 //        }
 
         totalDistances.append("|| ");
