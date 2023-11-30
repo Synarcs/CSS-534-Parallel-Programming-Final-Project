@@ -5,11 +5,13 @@ import random
 
 parser = ArgumentParser()
 
-def generateFacilitiesData(objectTypes, gridSize):
+def generateFacilitiesData(facilitySize, gridSize):
     data = list()
-    for prefix in ['F1', 'F2', 'F3']:
+
+    prefix_list = ['F' + str(i) for i in range(1, facilitySize + 1)]
+    for prefix in prefix_list:
         for i in range(1, gridSize + 1):
-            value = format(random.randint(0, 1 << gridSize - 1), '0{0}b'.format(gridSize))
+            value = format(random.randint(0, 1 << int(gridSize/2)), '0{0}b'.format(gridSize))
             featureMap = "{0} {1} {2}\n".format(prefix, i, value)
             data.append(featureMap)
 
@@ -23,8 +25,7 @@ if __name__ == "__main__":
         exit(1)
 
     random_data = generateFacilitiesData(int(sys.argv[1]), int(sys.argv[2]))
-    if os.path.exists(os.path.join(os.getcwd(), 'input')):
-        os.remove(os.path.join(os.getcwd(), 'input'))
-    with open(os.path.join(os.getcwd(), 'input'), 'w+') as inputGrid:
+    if os.path.exists(os.path.join(os.getcwd(), 'input.txt')):
+        os.remove(os.path.join(os.getcwd(), 'input.txt'))
+    with open(os.path.join(os.getcwd(), 'input.txt'), 'w+') as inputGrid:
         inputGrid.writelines(random_data)
-

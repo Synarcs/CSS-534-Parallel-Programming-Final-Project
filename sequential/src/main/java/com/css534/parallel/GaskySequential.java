@@ -373,8 +373,8 @@ class GaskySequential {
                     }
 
                     // Output results using rank as identifier
-                    System.out.println("Results from column  " + column + ": " +
-                            totalDistances.toString());
+                    // System.out.println("Results from column  " + column + ": " +
+                    //         totalDistances.toString());
 
                 }
             }
