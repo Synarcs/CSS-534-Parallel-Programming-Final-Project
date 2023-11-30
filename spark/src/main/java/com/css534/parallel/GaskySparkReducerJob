@@ -82,7 +82,7 @@ public class GaskySparkJob {
             List<Tuple2<Double, Double>> points = skylineObject._2()._2();
             for (int j = 0; j < points.size(); j++) {
                 Tuple2<Double, Double> point = points.get(j);
-                totalDistances.append(point._1()).append(",").append(point._2());
+                totalDistances.append(point._1());
                 if (j != points.size() - 1) {
                     totalDistances.append(",");
                 }
@@ -206,9 +206,10 @@ public class GaskySparkJob {
     int unDominatedPointsSize = points.size();
     int proximityIntervals = proximityProjectionsPoints.size() - 1;
     int dominatedCoordinatesDistances = 0;
-    
+
+
     //update distance implementation
-    for (int interval = 0; interval < proximityIntervals; interval++) {
+    for (int interval = 0; interval < proximityProjectionsPoints.size(); interval++) {
             double[] currentInterval = proximityProjectionsPoints.get(interval);
             Tuple2<Double,Double> dominantPoint = points.get(dominatedCoordinatesDistances);
             int start = (int) currentInterval[0];
@@ -230,13 +231,15 @@ public class GaskySparkJob {
                 }
                 dominatedCoordinatesDistances++;
         }
+
+
      // Debug: Print updated distances
         System.out.println("Updated Distances:");
         distances.forEach(System.out::println);
 
         for (Tuple2<Double, Double> point : points) {
-            double y = point._2();
-            Tuple2<Double, Double> updatedPoint = new Tuple2<>(y, (double) colNumber);
+            double x = point._1();
+            Tuple2<Double, Double> updatedPoint = new Tuple2<>(x, (double) colNumber);
             // Replace the existing point with the updated one
             points.set(points.indexOf(point), updatedPoint);
             }
