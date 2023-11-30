@@ -1,7 +1,5 @@
 package com.css534.parallel;
 
-package com.css534.parallel;
-
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.IOException;
