@@ -53,7 +53,6 @@ public class GaskyJob {
 
         JobClient client = new JobClient();
 
-
         RunningJob job = client.runJob(conf);
 
         while (!(job.isComplete() && job.isSuccessful())){
@@ -81,7 +80,7 @@ public class GaskyJob {
         conf2.set("unFavourableFacilitiesCount", extraConfig[1]);
         conf2.set("includeDistance", extraConfig[2]);
 
-        client.runJob(conf2);
+//        client.runJob(conf2);
 
         System.out.println("Elapsed Time :" + (System.currentTimeMillis() - time));
     }
