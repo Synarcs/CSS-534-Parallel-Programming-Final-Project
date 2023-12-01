@@ -60,6 +60,8 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         }
 
         String facilityName = distFavArray[0];
+        boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
+
         Integer matrixRowNumber = Integer.valueOf(distFavArray[1]);
         System.out.println("Processing the feature value as" + facilityName + " with the row number " + matrixRowNumber);
 
@@ -93,6 +95,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         // can also be implemented using a stack
         for (int i=0; i < binMatrixValues.length(); i++){
             leftDistance[i] = Double.min(leftDistance[i], rightDistance[i]);
+
         }
 
         for (int values = 0; values < leftDistance.length; values++){

@@ -13,6 +13,9 @@ import java.io.IOException;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.management.RuntimeErrorException;
+import javax.sound.midi.SysexMessage;
+
 import static com.css534.parallel.DelimeterRegexConsts.*;
 
 /**
@@ -20,56 +23,55 @@ import static com.css534.parallel.DelimeterRegexConsts.*;
  *  The union is done for each column and then reducer will reduce to make sure we get global unique skyline objects
  */
 @SuppressWarnings("unused")
-public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, GlobalOrderSkylineKey, GlobalSkylineObjects> {
+public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWritable, Text, GlobalOrderSkylineKey, Text> {
     private Log log = LogFactory.getLog(UnionFacilityMapper.class);
     private GlobalOrderSkylinePartioner writer = new GlobalOrderSkylinePartioner();
     @Override
-    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<GlobalOrderSkylineKey, GlobalSkylineObjects> outputCollector, Reporter reporter) throws IOException, ArrayIndexOutOfBoundsException {
-        try {
-            String objectInfo = skylineObjectProjections.toString();
-            String[] dataSplit =  objectInfo.split("\\s+");
+    public void map(LongWritable longWritable, Text skylineObjectProjections, OutputCollector<GlobalOrderSkylineKey, Text> outputCollector, Reporter reporter) throws IOException,
+            IllegalArgumentException,ArrayIndexOutOfBoundsException {
+        String objectInfo = skylineObjectProjections.toString();
+        int indexPipe = objectInfo.indexOf("||");
+        if (indexPipe == -1) {
+            log.error("Incorrect Projection format");
+            throw new IllegalArgumentException();
+        }
 
-            String facilityName = dataSplit[0];
+        String projectionValues = objectInfo.substring(0, indexPipe);
+        String[] dataSplit =  projectionValues.split("\\s+");
 
-            Pattern regex = Pattern.compile(SKYLINE_OBJECTS_LOADER);
-            Matcher matcher = regex.matcher(objectInfo);
+        if (dataSplit.length == 0) {
+            log.error("No Required X Row Projections found");
+            throw new IllegalArgumentException();
+        }
 
-            boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
+        String facilityName = dataSplit[0];
+        Integer columnProjection = Integer.parseInt(dataSplit[1]);
 
-            if (matcher.find()) {
-                String doubleArrayString = matcher.group(1).trim();
+        boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
 
-//                String[] doubleValues = doubleArrayString.split(",");
-                // the values are of the format [x1, x2, x3, x4 ... xn];
-                if (doubleArrayString.length() == 0){
-                    log.error("Error empty input for the string was found");
-                    return;
-                }
+        int rowIndex = 1;
+        for (int i=2; i < dataSplit.length; i++){
+            GlobalOrderSkylineKey key = new GlobalOrderSkylineKey(rowIndex, columnProjection);
 
-                int columnProjection = Integer.parseInt(dataSplit[1]);
-                String[] distanceXProjections = doubleArrayString.split("\\s+");
+            // System.out.println(key.getColNumber() + " " + key.getRowNumber() + " " + value.getFacilityType() + " " + value.getxProjectionsValue());
 
-                if (distanceXProjections.length == 0) {
-                    log.error("No Required X Row Projections found");
-                    return;
-                }
-
-                int rowIndex = 1;
-                for (int i=2; i < distanceXProjections.length; i++){
-                    outputCollector.collect(
-                            new GlobalOrderSkylineKey(rowIndex, columnProjection),
-                            new GlobalSkylineObjects(
-                                    facilityName, Double.valueOf(distanceXProjections[i])
-                            )
-                    );
-                    rowIndex++;
-                }
-            } else {
-                log.error("No match found.");
-                return;
+            // throw new RuntimeException();
+            if (isUnfavorableFacility){
+                outputCollector.collect(
+                        new GlobalOrderSkylineKey(rowIndex, columnProjection),
+                        new Text(
+                                String.valueOf(UNFAVOURABLE_POSITION + "," + Double.valueOf(dataSplit[i]))
+                        )
+                );
+            }else{
+                outputCollector.collect(
+                        new GlobalOrderSkylineKey(rowIndex, columnProjection),
+                        new Text(
+                                String.valueOf(FAVOURABLE_POSITION + "," + Double.valueOf(dataSplit[i]))
+                        )
+                );
             }
-        }catch (ArrayIndexOutOfBoundsException exception){
-            return;
+            rowIndex++;
         }
     }
 }

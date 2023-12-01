@@ -6,9 +6,8 @@ import org.apache.hadoop.io.Writable;
 import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
-import java.io.Serializable;
 
-public class MapValue implements Writable, Serializable {
+public class MapValue implements Writable {
 
     private double distance;
     private int rowValue;

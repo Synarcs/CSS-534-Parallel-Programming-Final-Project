@@ -16,9 +16,14 @@ public class GlobalOrderSkylineKey implements WritableComparable<GlobalOrderSkyl
         this.rowNumber = rowNumber;
         this.colNumber = colNumber;
     }
+
     @Override
     public int compareTo(GlobalOrderSkylineKey o) {
-        return rowNumber.compareTo(o.rowNumber); //  order by rowNumber for each column
+        int cmp = rowNumber.compareTo(o.rowNumber);
+        if (cmp == 0) {
+            cmp = Integer.compare(colNumber, o.colNumber);
+        }
+        return cmp;
     }
 
     public Integer getColNumber() {

@@ -1,5 +1,9 @@
-package com.css534.parallel;
+package com.css534.parallel.base;
 
+import com.css534.parallel.MapKeys;
+import com.css534.parallel.MapValue;
+import com.css534.parallel.Vector2FProjections;
+import com.css534.parallel.Vector2f;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.MapReduceBase;
 import org.apache.hadoop.mapred.OutputCollector;

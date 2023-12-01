@@ -8,6 +8,8 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.jobcontrol.JobControl;
 
+import com.css534.parallel.base.FacilityCombinerReducerBase;
+
 import java.io.IOException;
 import java.util.Arrays;
 
@@ -69,7 +71,7 @@ public class GaskyJob {
         conf2.setMapperClass(UnionFacilityMapper.class);
         conf2.setReducerClass(FacilityCombinerReducer.class);
         conf2.setMapOutputKeyClass(GlobalOrderSkylineKey.class);
-        conf2.setMapOutputValueClass(GlobalSkylineObjects.class);
+        conf2.setMapOutputValueClass(Text.class);
         conf2.setOutputKeyClass(Text.class);
         conf2.setOutputValueClass(Text.class);
         conf2.setInputFormat(TextInputFormat.class);
@@ -80,7 +82,7 @@ public class GaskyJob {
         conf2.set("unFavourableFacilitiesCount", extraConfig[1]);
         conf2.set("includeDistance", extraConfig[2]);
 
-//        client.runJob(conf2);
+        client.runJob(conf2);
 
         System.out.println("Elapsed Time :" + (System.currentTimeMillis() - time));
     }

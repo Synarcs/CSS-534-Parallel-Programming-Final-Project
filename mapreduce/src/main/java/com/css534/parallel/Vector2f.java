@@ -14,7 +14,7 @@ public class Vector2f implements Serializable, Writable {
     private double yy;
 
     public Vector2f() {}
-    Vector2f(double xx, double yy){this.xx = xx; this.yy = yy;}
+    public Vector2f(double xx, double yy){this.xx = xx; this.yy = yy;}
 
     public double getXx() {
         return xx;
