@@ -2,19 +2,17 @@ package com.css534.parallel;
 
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
-import org.apache.hadoop.io.IntWritable;
 import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
 
 import java.io.IOException;
 import java.util.*;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
-import static com.css534.parallel.DelimeterRegexConsts.FACILITY_TYPE;
-import static com.css534.parallel.DelimeterRegexConsts.UNFAVOURABLE_POSITION;
+import static com.css534.parallel.DelimeterRegexConsts.FACILITY_COUNT;
+import static com.css534.parallel.DelimeterRegexConsts.FAVOURABLE_POSITION;
 
-public class FacilityCombinerReducer extends MapReduceBase implements Reducer<IntWritable, Text, Text, Text> {
+
+public class FacilityCombinerReducer extends MapReduceBase implements Reducer<GlobalOrderSkylineKey, GlobalSkylineObjects, Text, Text> {
     private JobConf conf;
     private Log log = LogFactory.getLog(FacilityCombinerReducer.class);
 
@@ -26,56 +24,50 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<In
 
 
     @Override
-    public void reduce(IntWritable facilityNameColumn, Iterator<Text> iterator, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
+    public void reduce(GlobalOrderSkylineKey compositeIndex,
+                            Iterator<GlobalSkylineObjects> projectionValues, OutputCollector<Text, Text> outputCollector, Reporter reporter) throws IOException {
 
-        int colNumber = facilityNameColumn.get();
-        Set<Double> favourable = new HashSet<>();
-        Set<Double> unfavourable = new HashSet<>();
-        // later implement hadoop batch Processing
+        /*
+            expected will receive values (facilityName, distance)
+            this provides unique shuffle sort based on each grid cell in the map can be optimized using a local combiner
+        */
+        int colNumber = compositeIndex.getColNumber();
+        int rowNumber = compositeIndex.getRowNumber();
 
-        Map<Double, Integer> favColProjectionMap = new HashMap<>();
-        Map<Double, Integer> unFavCalProjectionMap = new HashMap<>();
+        List<GlobalSkylineObjects> processGridData[] = new ArrayList[FACILITY_COUNT];
 
-
-        // for faster performance consideration later batch segmentation of data can be used.
-        while (iterator.hasNext()) {
-            String[] type = iterator.next().toString().split("\\s+");
-            if (type.length != 2)
-                return;
-            String facilityType = type[0];
-            double xRowProjection = Double.valueOf(type[1]);
-            if (facilityType.equals(UNFAVOURABLE_POSITION))
-                unFavCalProjectionMap.put(xRowProjection, unFavCalProjectionMap.getOrDefault(xRowProjection, 0) + 1);
-            else
-                favColProjectionMap.put(xRowProjection, favColProjectionMap.getOrDefault(xRowProjection, 0) + 1);
+        while (projectionValues.hasNext()){
+            GlobalSkylineObjects currentObject = projectionValues.next();
+            if (currentObject.getFacilityType().equals(FAVOURABLE_POSITION)){
+                processGridData[0].add(currentObject);
+            }else
+                processGridData[1].add(currentObject);
         }
 
-        for (Double xCordProjection: favColProjectionMap.keySet()){
-            if (favColProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("favourableFacilitiesCount"))){
-                favourable.add(xCordProjection);
-            }
-        }
-        for (Double xCordProjection: unFavCalProjectionMap.keySet()){
-            if (unFavCalProjectionMap.get(xCordProjection) == Integer.parseInt(this.conf.get("unFavourableFacilitiesCount"))) {
-                unfavourable.add(xCordProjection);
-            }
-        }
+        double globalMinimaIndexFav = Double.MAX_VALUE;
+        double globalMinimaIndexUnFav = Double.MAX_VALUE;
 
-        favourable.removeAll(unfavourable);
+        for (int i=0; i < processGridData[0].size(); i++)
+            globalMinimaIndexFav = Double.min(globalMinimaIndexFav, processGridData[0].get(i).getxProjectionsValue());
+
+        for (int i=0; i < processGridData[1].size(); i++)
+            globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, processGridData[1].get(i).getxProjectionsValue());
+
+        log.info("The size of the reduced columns for all fav grids is " + processGridData[0].size());
+        log.info("The size of the reduced columns for all unFav grids is " + processGridData[1].size());
+
+        // the size should match total number of facilities including fav and unfavourable
+        if (globalMinimaIndexUnFav < globalMinimaIndexFav || globalMinimaIndexFav == globalMinimaIndexUnFav){
+            log.info("The minimum scale object with unFav facility more closer");
+            return;
+        }
 
         StringBuilder builder = new StringBuilder();
-
-
-        favourable.stream().forEach((value) -> {
-            builder.append(value);
-            builder.append(",");
-        });
-
         String ans = builder.substring(0, builder.length() - 1);
 
         outputCollector.collect(
-                new Text(String.valueOf(colNumber)),
-                new Text(ans)
+                new Text(String.valueOf(rowNumber)),
+                new Text(String.valueOf(colNumber))
         );
     }
 }

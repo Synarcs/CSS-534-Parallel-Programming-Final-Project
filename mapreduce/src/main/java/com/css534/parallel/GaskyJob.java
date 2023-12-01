@@ -68,8 +68,8 @@ public class GaskyJob {
         // Set configurations for Job 2 as needed
         conf2.setMapperClass(UnionFacilityMapper.class);
         conf2.setReducerClass(FacilityCombinerReducer.class);
-        conf2.setMapOutputKeyClass(IntWritable.class);
-        conf2.setMapOutputValueClass(Text.class);
+        conf2.setMapOutputKeyClass(GlobalOrderSkylineKey.class);
+        conf2.setMapOutputValueClass(GlobalSkylineObjects.class);
         conf2.setOutputKeyClass(Text.class);
         conf2.setOutputValueClass(Text.class);
         conf2.setInputFormat(TextInputFormat.class);
