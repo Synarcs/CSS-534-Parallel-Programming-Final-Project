@@ -21,7 +21,6 @@ public class Main {
 
     public Main(){}
 
-    private static int gridSize = 8;
 
     private static Tuple2<Double, Double> calcBisectorProjections(double x, double y , double x1, double y1){
         double xx = ((y1 * y1 ) - (y * y) + (x1 * x1) - (x * x)) / 2 * (x1 - x);
@@ -31,7 +30,7 @@ public class Main {
         );
     }
 
-    private static List<double[]> findProximityPoints(List<Tuple2<Double, Double>> unDominatedPoints) {
+    private static List<double[]> findProximityPoints(List<Tuple2<Double, Double>> unDominatedPoints, int gridSize) {
         List<Tuple2<Double, Double>> intervals = new ArrayList<>();
         for (int i=1; i < unDominatedPoints.size(); i++){
             Tuple2<Double, Double> point1 = unDominatedPoints.get(i-1);
@@ -83,7 +82,7 @@ public class Main {
         This will run for each column and determine the closest distance from skyline objects
         This will all return the final skyline objects if any
      */
-    public static List<Double> mrGaskyAlgorithm(Iterable<Tuple2<Double, Double>> cartesianProjectPoints) throws RuntimeException, NoSuchElementException {
+    public static List<Double> mrGaskyAlgorithm(Iterable<Tuple2<Double, Double>> cartesianProjectPoints, int gridSize) throws RuntimeException, NoSuchElementException {
         int totalPoints = 0;
         for (Tuple2<Double, Double> points: cartesianProjectPoints) totalPoints++;
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
@@ -118,7 +117,7 @@ public class Main {
             }
 
             log.info("The current remained dominated points are");
-            List<double[]> proximityProjectionsPoints = findProximityPoints(points);
+            List<double[]> proximityProjectionsPoints = findProximityPoints(points, gridSize);
             List<Double> testData = proximityProjectionsPoints.stream().map((i) -> i[0]).collect(Collectors.toList());
 
             int unDominatedPointsSize = points.size();
@@ -275,6 +274,13 @@ public class Main {
         });
     }
 
+    private static int getGridSize(List<String> fileLineInput) throws RuntimeException {
+        String[] input = fileLineInput.get(0).split("\\s+");
+        if (input.length == 0 && input.length != 3)
+            throw new RuntimeException();
+
+        return input[input.length - 1].length();
+    }
     public static void main(String[] args) {
 
         SparkConf conf = new SparkConf().setAppName("GaskySparkJob")
@@ -284,6 +290,7 @@ public class Main {
 
         System.out.println(Arrays.toString(args));
         String fileName = args[0];
+        long startTime = System.currentTimeMillis();
 
         try {
             JavaSparkContext sc = new JavaSparkContext(conf);
@@ -295,10 +302,11 @@ public class Main {
                     Integer.parseInt(sc.getConf().get("spark.executor.instances"));
 
             numCores = numCores * clusterSize;
-            int gridSize = 8; // keep this for now;
 
             // read the file from hdfs later
             JavaRDD<String> inputData = sc.textFile(fileName).repartition(numCores);
+
+            System.out.println("the grid size for the skyline objects is " + Integer.parseInt(args[1]));
 
             JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Double, Double>>> data = inputData
                     .flatMapToPair(fileLine -> parseInputData(fileLine))
@@ -327,7 +335,7 @@ public class Main {
                 debug(data);
 
             JavaPairRDD<Tuple2<String, Integer>, List<Double>> colProjections = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
-                return mrGaskyAlgorithm(columnProjection).iterator();
+                return mrGaskyAlgorithm(columnProjection, Integer.parseInt(args[1])).iterator();
             }).mapValues((Iterator<Double> iter) -> {
                 List<Double> list = new ArrayList<>();
                 while (iter.hasNext()) {
@@ -441,6 +449,7 @@ public class Main {
                 System.out.println(v._1() + " -----> " + v._2());
             });
 
+            System.out.println("Elasped Time: " + (System.currentTimeMillis() - startTime));
         }catch (Exception exception){
             System.out.println("error in processing the spark context");
             exception.printStackTrace();
