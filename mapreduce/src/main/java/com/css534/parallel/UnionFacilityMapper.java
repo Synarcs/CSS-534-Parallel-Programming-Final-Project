@@ -10,11 +10,6 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reporter;
 
 import java.io.IOException;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-
-import javax.management.RuntimeErrorException;
-import javax.sound.midi.SysexMessage;
 
 import static com.css534.parallel.DelimeterRegexConsts.*;
 

@@ -53,22 +53,30 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Gl
         }
 
         double globalMaxIndexFav = Double.MIN_VALUE;
+        double globalMaxIndexUnFav = Double.MIN_VALUE;
 
         double globalMinimaIndexFav = Double.MAX_VALUE;
         double globalMinimaIndexUnFav = Double.MAX_VALUE;
 
-        for (Double fd: processGridData[0])
+        for (Double fd: processGridData[0]){
             globalMinimaIndexFav = Double.min(globalMinimaIndexFav, fd);
+            globalMaxIndexFav = Double.min(globalMaxIndexFav, fd);
+        }
 
-        for (Double ud: processGridData[1])
+        for (Double ud: processGridData[1]){
             globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, ud);
+            globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, ud);
+        }
 
         log.info("The size of the reduced columns for all fav grids is " + processGridData[0].size());
         log.info("The size of the reduced columns for all unFav grids is " + processGridData[1].size());
 
         // // the size should match total number of facilities including fav and unfavourable
         if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE){
-            if (globalMinimaIndexUnFav < globalMinimaIndexFav || globalMinimaIndexFav == globalMinimaIndexUnFav){
+            if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
+                    globalMinimaIndexFav == globalMinimaIndexUnFav ||
+                        globalMaxIndexFav > globalMinimaIndexUnFav ||
+                        globalMinimaIndexFav > globalMaxIndexUnFav){
                 log.info("The minimum scale object with unFav facility more closer");
                 return;
             }

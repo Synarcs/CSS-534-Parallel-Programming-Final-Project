@@ -1,7 +1,3 @@
-package com.css534.parallel;
-
-
-
 import java.io.Serializable;
 
 public class Vector2FProjections implements Serializable {
@@ -24,4 +20,5 @@ public class Vector2FProjections implements Serializable {
         this.xx = xx;
     }
 }
+
 

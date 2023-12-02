@@ -9,11 +9,9 @@ import org.apache.hadoop.mapred.OutputCollector;
 import org.apache.hadoop.mapred.Reducer;
 import org.apache.hadoop.mapred.Reporter;
 
-import javax.sound.sampled.Line;
 import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
