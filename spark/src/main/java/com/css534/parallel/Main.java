@@ -14,6 +14,8 @@ import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import javax.sound.midi.SysexMessage;
+
 public class Main {
     private final static int clusterSize = 4;
     private final static boolean DEBUG = false;
@@ -381,9 +383,10 @@ public class Main {
                         }
                         return listFlatten.iterator();
                     }).groupByKey();
+            // .sortByKey(Comparator.comparing(Tuple2::_2), true, numCores);
 
             if (DEBUG){
-                mergedGlobalReduce.collect().forEach((Tuple2<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> value) -> {
+                mergedGlobalReduce.take(1).forEach((Tuple2<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> value) -> {
                     System.out.println(value._1()._1() + " " + value._1()._2());
                     for (Tuple2<Integer, Double> pres: value._2()){
                         System.out.println(pres + "\t");
@@ -391,31 +394,37 @@ public class Main {
                 });
             }
 
+            System.out.println("Applying global Skyline Point Reduction on grid");
 
-            mergedGlobalReduce.flatMapToPair(val -> {
+            if (DEBUG)
+                mergedGlobalReduce.collect().forEach((reducedProjections) -> {
+                    System.out.println(reducedProjections._1() + ",,,," + reducedProjections._2());
+                });
+
+            // did not use flatmapto pair for memory efficienty and less requirement for shuffle sort on the rdd
+            JavaPairRDD<Tuple2<Integer, Integer>, Boolean> filterDominantGlobalPoints = mergedGlobalReduce.mapValues((Iterable<Tuple2<Integer, Double>> projectedPointPlane) -> {
                 double globalMaxIndexFav = Double.MIN_VALUE;
                 double globalMaxIndexUnFav = Double.MIN_VALUE;
 
                 double globalMinimaIndexFav = Double.MAX_VALUE;
                 double globalMinimaIndexUnFav = Double.MAX_VALUE;
 
-                // System.out.println("called inside flatmap transofrm");
-
-                Iterable<Tuple2<Integer, Double>> columnProjections = val._2();
-
-                int colNumber = val._1()._1();
-                int rowNumber = val._1()._2();
-
                 int FACILITY_COUNT = 2;
                 List<Double> processGridData[] = new ArrayList[FACILITY_COUNT];
-
                 for (int i=0; i < processGridData.length; i++) processGridData[i] = new ArrayList<>();
 
-                for (Tuple2<Integer, Double> columnProjection : columnProjections){
-                    if (columnProjection._1() == 1){
-                        processGridData[1].add(columnProjection._2());
-                    }else
-                        processGridData[0].add(columnProjection._2());
+                final int FAVOURABLE_POSITION = 1;
+                final int UNFAVOURABLE_POSITION = 0;
+                // facility Type    min Distance suggested by projection
+                for (Tuple2<Integer, Double> combinedCoordinateprojection: projectedPointPlane){
+                    if (combinedCoordinateprojection._1() == FAVOURABLE_POSITION)
+                        processGridData[0].add(
+                                combinedCoordinateprojection._2()
+                        );
+                    else
+                        processGridData[1].add(
+                                combinedCoordinateprojection._2()
+                        );
                 }
 
                 for (Double fd: processGridData[0]){
@@ -428,25 +437,68 @@ public class Main {
                     globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, ud);
                 }
 
-                List<Tuple2<Integer, Integer>> scaleProjector = new ArrayList<>();
-
-
                 if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE){
                     if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
                             globalMinimaIndexFav == globalMinimaIndexUnFav ||
                             globalMaxIndexFav > globalMinimaIndexUnFav ||
                             globalMinimaIndexFav > globalMaxIndexUnFav){
-                        System.out.println("The associated data will be removed");
+                        log.info("The minimum scale object with unFav facility more closer");
+                        return false;
+                    }else {
+                        return true;
                     }
-                }else {
-                    scaleProjector.add(
-                            new Tuple2<Integer,Integer>(colNumber, rowNumber)
-                    );
                 }
+                return false;
+            });
 
-                return scaleProjector.iterator();
-            }).collect().forEach(v -> {
-                System.out.println(v._1() + " -----> " + v._2());
+            if (DEBUG)
+                filterDominantGlobalPoints.collect().forEach((reducedProjections) -> {
+                    System.out.println(reducedProjections._1() + "<--->" + reducedProjections._2());
+                });
+
+
+            filterDominantGlobalPoints = filterDominantGlobalPoints.filter((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> value._2());
+
+            JavaPairRDD<Integer, Integer> transformedCoordinates = filterDominantGlobalPoints.mapToPair((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> {
+                int colProjection = value._1()._1;
+                int rowProjection = value._1()._2;
+
+                return new Tuple2<Integer, Integer>(
+                        rowProjection,
+                        colProjection
+                );
+            });
+
+            JavaPairRDD<Integer, Integer> orderedCoordinateProjection = transformedCoordinates.sortByKey()
+                    .groupByKey()
+                    .mapValues((orderedColumnProjection) -> {
+                        List<Integer> sortedValues = new ArrayList<>();
+                        orderedColumnProjection.forEach(sortedValues::add);
+                        Collections.sort(sortedValues);
+                        return sortedValues;
+                    })
+                    .flatMapToPair((Tuple2<Integer, List<Integer>> value) -> {
+
+                        List<Tuple2<Integer, Integer>> resultOdering = new ArrayList<>();
+                        int currentOrderedRowProjection = value._1();
+
+                        for (Integer colProjection: value._2()){
+                            resultOdering.add(
+                                    new Tuple2<>(
+                                            currentOrderedRowProjection,
+                                            colProjection
+                                    )
+                            );
+                        }
+                        return resultOdering.iterator();
+                    });
+
+
+            orderedCoordinateProjection.collect().forEach((reducedProjections) -> {
+                // projecting the final orderProjection of coordinates
+                System.out.println(
+                        reducedProjections._1() + "  " + reducedProjections._2()
+                );
             });
 
             System.out.println("Elasped Time: " + (System.currentTimeMillis() - startTime));

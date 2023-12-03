@@ -23,6 +23,7 @@ public class Main {
         spatialGrid.callAll(INIT, globalBinaryGrid);
         MASS.getLogger().debug("Initialization done for the skyline object grid");
 
+
         int totalSpatialgridSize = spatialGrid.getPlacesSize();
 
         Place[] distributedArray = spatialGrid.getPlaces();

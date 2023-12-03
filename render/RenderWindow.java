@@ -74,6 +74,8 @@ public class RenderWindow extends JFrame implements Runnable {
             br.close();
         } catch (IOException e) {
             e.printStackTrace();
+        }catch (RuntimeException exception) {
+            exception.printStackTrace();
         }
     }
 

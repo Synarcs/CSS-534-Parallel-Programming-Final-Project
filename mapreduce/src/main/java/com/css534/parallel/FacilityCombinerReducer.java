@@ -83,8 +83,8 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Gl
         }
 
         outputCollector.collect(
-                new Text(String.valueOf(colNumber)),
-                new Text(String.valueOf(rowNumber))
+                new Text(String.valueOf(rowNumber)),
+                new Text(String.valueOf(colNumber))
         );
     }
 }
