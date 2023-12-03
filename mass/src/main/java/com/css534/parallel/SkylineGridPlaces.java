@@ -5,6 +5,18 @@ import static com.css534.parallel.GridConstants.INIT;
 
 @SuppressWarnings("unused")
 public class SkylineGridPlaces extends Place {
+
+    private static int myX, myY;
+    private static int sizeX, sizeY;
+    private double leftSumAgent = Double.MAX_VALUE, rightSumAgent = Double.MAX_VALUE;
+
+    public double getLeftSumAgent() {
+        return leftSumAgent;
+    }
+    public double getRightSumAgent() {
+        return rightSumAgent;
+    }
+
     @Override
     public String toString() {
         return super.toString();
