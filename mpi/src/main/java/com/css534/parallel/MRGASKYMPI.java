@@ -1,8 +1,14 @@
+
 package com.css534.parallel;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.ObjectInputStream;
+import java.io.ObjectOutputStream;
+import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -13,10 +19,18 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
+import java.util.stream.Collectors;
 
 import mpi.*;
 
 class MRGASKYMPI {
+    public static class Minmax implements Serializable {
+        double min;
+        double max;
+        int i;
+        int j;
+    }
+
     public static class Vector2f {
         private double xx;
         private double yy;
@@ -153,9 +167,7 @@ class MRGASKYMPI {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
 
-
         if (totalPoints > 2) {
-
 
             List<Vector2f> points = new LinkedList<>();
 
@@ -186,9 +198,7 @@ class MRGASKYMPI {
                 }
             }
 
-
             List<double[]> proximityProjectionsPoints = findProximityPoints(points, gridSize);
-
 
             List<Double> testData = new ArrayList<>();
             for (double[] interval : proximityProjectionsPoints) {
@@ -209,7 +219,6 @@ class MRGASKYMPI {
                 int end = (int) currentInterval[1];
                 Vector2f dominantPoint = points.get(dominatedCoordinatesDistances);
 
-
                 // We only consider the int projection over x-axis for grid skyline
                 for (int xCord = start; xCord <= end; xCord++) {
                     if (distances.get(xCord - 1) != Double.MAX_VALUE) {
@@ -224,8 +233,6 @@ class MRGASKYMPI {
                                 findEuclideanDistance(xCord, 0, dominantPoint.getXx(), dominantPoint.getYy()));
                 }
 
-
-
                 dominatedCoordinatesDistances++;
             }
 
@@ -235,7 +242,6 @@ class MRGASKYMPI {
                     points);
 
         }
-
 
         Deque<Vector2f> proximityProjectionsPoints = findProximityPointsSingle(cartesianProjectPoints);
         if (proximityProjectionsPoints.size() == 0 && cartesianProjectPoints.size() == 1) {
@@ -261,7 +267,6 @@ class MRGASKYMPI {
 
             return new SkylineObjects(maxDistanceList, new ArrayList<>());
         }
-
 
         /*
          * It has 2 dominated points in the grid and a single interval that is the
@@ -311,36 +316,42 @@ class MRGASKYMPI {
         int rank = MPI.COMM_WORLD.Rank();
         int size = MPI.COMM_WORLD.Size();
 
-        long startTime = System.currentTimeMillis();
-
         if (rank == 0 && args.length != 3) {
-            System.err.println("Usage: java MRGASKYMPI <numberOfFacilities> size size");
+            System.err.println("Usage: java MRGASKYMPI <numberOfFacilities> size size favourable unfavourable");
             MPI.Finalize();
             System.exit(1);
         }
 
-        int[] params = new int[3];
+        int[] params = new int[5];
         if (rank == 0) {
             params[0] = Integer.parseInt(args[0]);
             params[1] = Integer.parseInt(args[1]);
             params[2] = Integer.parseInt(args[2]);
+            params[3] = Integer.parseInt("2");
+            params[4] = Integer.parseInt("1");
         }
 
-        MPI.COMM_WORLD.Bcast(params, 0, 3, MPI.INT, 0);
+        MPI.COMM_WORLD.Bcast(params, 0, 5, MPI.INT, 0);
 
         int numberOfFacilities = params[0];
         int m = params[1];
         int n = params[2];
+        int fav = params[3];
+        int unfav = params[4];
 
-        System.out.println("rank:" + rank + " , numberOfFacilities:" + numberOfFacilities);
+        System.out.println("rank:" + rank + " , numberOfFacilities:" +
+                numberOfFacilities);
         System.out.println("rank:" + rank + " , m:" + m);
         System.out.println("rank:" + rank + " , n:" + n);
         System.out.println("rank:" + rank + " , size:" + size);
+        System.out.println("rank:" + rank + " , favroiurable:" + fav);
+        System.out.println("rank:" + rank + " , unfavroiurable:" + unfav);
 
         int facilitiesPerRank = numberOfFacilities / size;
         int startIndex = rank * facilitiesPerRank;
         int endindex = startIndex + facilitiesPerRank;
         int remainder = m % size;
+        long startTime = System.currentTimeMillis();
 
         double[][][] FacilityGrid = new double[facilitiesPerRank][m][n];
 
@@ -348,7 +359,7 @@ class MRGASKYMPI {
             String filePath = "input.txt";
             FacilityGrid = initializeArray(facilitiesPerRank, m, n, rank, filePath);
 
-
+            System.out.println("Running computation on Rank-" + rank);
             // MRGASKY algorithm
             for (int facility = 0; facility < facilitiesPerRank; facility++) {
                 for (int row = 0; row < m; row++) {
@@ -376,7 +387,6 @@ class MRGASKYMPI {
                             rank);
 
                     int gridSize = orderedMap.size();
-
 
                     // Create a list to store Vector2f objects
                     List<Vector2f> cartesianProjections = new ArrayList<>();
@@ -406,30 +416,103 @@ class MRGASKYMPI {
                     // Calculate skyline objects for this rank
                     SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections, gridSize);
 
-                    // Output results
-                    StringBuilder totalDistances = new StringBuilder();
-
                     for (int i = 0; i < objects.getDistances().size(); i++) {
-                        totalDistances.append(objects.getDistances().get(i));
-                        totalDistances.append(" ");
+                        FacilityGrid[facility][i][column] = objects.getDistances().get(i);
                     }
-                    totalDistances.append(" --> ");
-
-                    for (int i = 0; i < objects.getSkylineObjects().size(); i++) {
-                        totalDistances.append("(" + objects.getSkylineObjects().get(i).getXx() + ","
-                                + objects.getSkylineObjects().get(i).getYy() + ")");
-                    }
-
-                    // Output results using rank as identifier
-                    System.out.println("Results from rank " + rank + ", column  " + column + ": " +
-                            totalDistances.toString());
-
                 }
             }
 
+            // print fav and unfav grids
+            for (int facility = 0; facility < facilitiesPerRank; facility++) {
+                System.out.println("Facility Grid:" + facility + " at Rank:" + rank + ":");
+                for (int row = 0; row < m; row++) {
+                    for (int column = 0; column < n; column++) {
+                        System.out.print(FacilityGrid[facility][row][column] + " ");
+                    }
+                    System.out.println();
+                }
+                System.out.println();
+            }
+
+            // Step-3 Algorithm - Global Skyline Objects
+            List<Minmax> minmaxList = new ArrayList<>();
+
+            for (int i = 0; i < m; i++) {
+                for (int j = 0; j < n; j++) {
+                    Double local_min_val = Double.MAX_VALUE;
+                    Double local_max_val = Double.MIN_VALUE;
+                    Minmax minmax = new Minmax();
+                    for (int k = 0; k < facilitiesPerRank; k++) {
+                        // print i,j,k,rank
+                        System.out.println("i:" + i + " j:" + j + " k:" + k + " rank:" + rank);
+                        minmax.min = Double.min(local_min_val, FacilityGrid[k][i][j]);
+                        minmax.max = Double.min(local_max_val, FacilityGrid[k][i][j]);
+                    }
+                    minmax.i = i;
+                    minmax.j = j;
+                    minmaxList.add(minmax);
+                }
+            }
+
+            // add barrier
+            MPI.COMM_WORLD.Barrier();
+
+            // print minmaxList
+            for (Minmax minmax : minmaxList) {
+
+                System.out.println("Rank:" + rank + " Min:" + minmax.min + " Max:" + minmax.max + " i:" + minmax.i
+                        + " j:" + minmax.j);
+            }
+
+            if (rank != 0) {
+                try {
+                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+                    ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+
+                    objectOutputStream.writeObject(minmaxList);
+
+                    byte[] serializedData = byteArrayOutputStream.toByteArray();
+
+                    MPI.COMM_WORLD.Send(serializedData, 0, serializedData.length, MPI.BYTE, 0, 0);
+
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+
+            } else {
+                // Rank 0 receives the List<Minmax> from non-0 ranks
+                List<Minmax> receivedList = new ArrayList<>();
+
+                for (int i = 1; i < MPI.COMM_WORLD.Size(); i++) {
+                    Status status = MPI.COMM_WORLD.Recv(null, 0, MPI.BYTE, i, 0);
+
+                    byte[] receivedData = new byte[status.getCount(MPI.BYTE)];
+
+                    MPI.COMM_WORLD.Recv(receivedData, 0, receivedData.length, MPI.BYTE, i, 0);
+
+                    try {
+                        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(receivedData);
+                        ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
+
+                        List<Minmax> sublist = (List<Minmax>) objectInputStream.readObject();
+                        receivedList.addAll(sublist);
+
+                    } catch (IOException | ClassNotFoundException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+                // Process the receivedList on rank 0
+                for (Minmax minmax : receivedList) {
+                    System.out.println("Received Minmax: min=" + minmax.min + ", max=" + minmax.max +
+                            ", i=" + minmax.i + ", j=" + minmax.j);
+                }
+            }
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
-            System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
+
+            if (rank == 0)
+                System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
 
         } catch (IOException e) {
             e.printStackTrace();
@@ -463,6 +546,8 @@ class MRGASKYMPI {
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             String line;
+            int facilityIndex;
+
             while ((line = br.readLine()) != null) {
                 StringTokenizer tokenizer = new StringTokenizer(line);
 
@@ -480,10 +565,16 @@ class MRGASKYMPI {
                 }
 
                 // Populate the facilityGrid array
-                int facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1; // Adjusted for 0-based indexing
+                if (facilityName.contains("-")) {
+                    facilityIndex = Integer.parseInt(facilityName.substring(1, 2)) - 1;
+
+                } else {
+                    facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1;
+                }
+
+                // Populate the facilityGrid array
                 int belongToRank = facilityIndex / facilitiesPerRank;
                 int index = facilityIndex % facilitiesPerRank;
-
 
                 if (belongToRank == r) {
 

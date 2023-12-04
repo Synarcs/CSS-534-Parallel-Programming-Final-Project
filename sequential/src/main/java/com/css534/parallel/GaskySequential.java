@@ -1,6 +1,7 @@
 package com.css534.parallel;
 
 import java.io.BufferedReader;
+import java.io.Console;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.Serializable;
@@ -17,6 +18,14 @@ import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
 class GaskySequential {
+
+    public static class Minmax {
+        double min;
+        double max;
+        int i;
+        int j;
+    }
+
     public static class Vector2f {
         private double xx;
         private double yy;
@@ -148,8 +157,7 @@ class GaskySequential {
                 points.add(cartesianProjectPoints.get(i));
 
             // Filtering the points based on dominance to further calculate proximity
-            // distance. Need to check while loop condition. we can use
-            // cartesianProjectPoints.size in while.
+            // distance.
             int currentWindowStart = 1;
             while (points.size() >= 3 && currentWindowStart <= points.size() - 2) {
                 Vector2f ii = points.get(currentWindowStart - 1);
@@ -288,19 +296,25 @@ class GaskySequential {
 
         long startTime = System.currentTimeMillis();
 
-        if (args.length != 3) {
-            System.err.println("Usage: java MRGASKY <numberOfFacilities> size size");
+        if (args.length != 5) {
+            System.err.println("Usage: java MRGASKY <numberOfFacilities> size size favourablecount unfavourablecount");
             System.exit(1);
         }
 
         int numberOfFacilities = Integer.parseInt(args[0]);
         int m = Integer.parseInt(args[1]);
         int n = Integer.parseInt(args[2]);
+        int fav = Integer.parseInt(args[3]);
+        int unfav = Integer.parseInt(args[4]);
 
-        double[][][] FacilityGrid = new double[numberOfFacilities][m][n];
+        double[][][] FacilityGrid = new double[fav + unfav][m][n];
+        double[][][] FavourableFacilityGrid = new double[fav][m][n];
+        double[][][] UnFavourableFacilityGrid = new double[unfav][m][n];
 
         try {
             String filePath = "input.txt";
+
+            // Initialize the FacilityGrid array
             FacilityGrid = initializeArray(numberOfFacilities, m, n, filePath);
 
             // MRGASKY algorithm
@@ -365,20 +379,126 @@ class GaskySequential {
                         totalDistances.append(objects.getDistances().get(i));
                         totalDistances.append(" ");
                     }
-                    totalDistances.append(" --> ");
 
-                    for (int i = 0; i < objects.getSkylineObjects().size(); i++) {
-                        totalDistances.append("(" + objects.getSkylineObjects().get(i).getXx() + ","
-                                + objects.getSkylineObjects().get(i).getYy() + ")");
-                    }
+                    // for (int i = 0; i < objects.getSkylineObjects().size(); i++) {
+                    // totalDistances.append("(" + objects.getSkylineObjects().get(i).getXx() + ","
+                    // + objects.getSkylineObjects().get(i).getYy() + ")");
+                    // }
 
                     // Output results using rank as identifier
-                    // System.out.println("Results from column  " + column + ": " +
-                    //         totalDistances.toString());
+                    System.out.println("Results from column " + column + ": " +
+                            totalDistances.toString());
 
+                    // store the favourable and unfavourable facility grids
+                    for (int row = 0; row < m; row++) {
+                        if (facility < fav) {
+                            FavourableFacilityGrid[facility][row][column] = objects.getDistances().get(row);
+                        } else {
+                            UnFavourableFacilityGrid[facility - fav][row][column] = objects.getDistances().get(row);
+                        }
+                    }
                 }
             }
 
+            // print fav and unfav grids
+            for (int facility = 0; facility < fav; facility++) {
+                System.out.println("Favourable Facility Grid " + facility + ":");
+                for (int row = 0; row < m; row++) {
+                    for (int column = 0; column < n; column++) {
+                        System.out.print(FavourableFacilityGrid[facility][row][column] + " ");
+                    }
+                    System.out.println();
+                }
+                System.out.println();
+            }
+
+            for (int facility = 0; facility < unfav; facility++) {
+                System.out.println("UnFavourable Facility Grid " + facility + ":");
+                for (int row = 0; row < m; row++) {
+                    for (int column = 0; column < n; column++) {
+                        System.out.print(UnFavourableFacilityGrid[facility][row][column] + " ");
+                    }
+                    System.out.println();
+                }
+                System.out.println();
+            }
+
+            // Step-3 Algorithm - Global Skyline Objects
+            List<Minmax> minmaxFavList = new ArrayList<>();
+
+            for (int i = 0; i < m; i++) {
+                for (int j = 0; j < n; j++) {
+                    Double local_min_val = Double.MAX_VALUE;
+                    Double local_max_val = Double.MIN_VALUE;
+                    Minmax minmax = new Minmax();
+                    for (int k = 0; k < fav; k++) {
+                        minmax.min = Double.min(local_min_val, FavourableFacilityGrid[k][i][j]);
+                        minmax.max = Double.min(local_max_val, FavourableFacilityGrid[k][i][j]);
+                    }
+                    minmax.i = i;
+                    minmax.j = j;
+                    minmaxFavList.add(minmax);
+                }
+            }
+
+            List<Minmax> minmaxUnFavList = new ArrayList<>();
+
+            for (int i = 0; i < m; i++) {
+                for (int j = 0; j < n; j++) {
+                    Double local_min_val = Double.MAX_VALUE;
+                    Double local_max_val = Double.MIN_VALUE;
+                    Minmax minmax = new Minmax();
+                    for (int k = 0; k < unfav; k++) {
+                        minmax.min = Double.min(local_min_val, UnFavourableFacilityGrid[k][i][j]);
+                        minmax.max = Double.min(local_max_val, UnFavourableFacilityGrid[k][i][j]);
+                    }
+                    minmax.i = i;
+                    minmax.j = j;
+                    minmaxUnFavList.add(minmax);
+                }
+            }
+
+            @SuppressWarnings("unchecked")
+            List<Minmax> globalFacility[] = new ArrayList[2];
+
+            for (int i = 0; i < globalFacility.length; i++)
+                globalFacility[i] = new ArrayList<>();
+
+            // iterate over minmaxFavList and add item to globalFacility
+            for (Minmax minmax : minmaxFavList) {
+                globalFacility[0].add(minmax);
+            }
+
+            for (Minmax minmax : minmaxUnFavList) {
+                globalFacility[1].add(minmax);
+            }
+
+            for (int i = 0; i < globalFacility.length; i++) {
+                double globalMaxIndexFav = Double.MIN_VALUE;
+                double globalMaxIndexUnFav = Double.MIN_VALUE;
+
+                double globalMinimaIndexFav = Double.MAX_VALUE;
+                double globalMinimaIndexUnFav = Double.MAX_VALUE;
+
+                globalMinimaIndexFav = Double.min(globalMinimaIndexFav, globalFacility[0].get(i).min);
+                globalMaxIndexFav = Double.min(globalMaxIndexFav, globalFacility[0].get(i).max);
+
+                globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, globalFacility[1].get(i).min);
+                globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, globalFacility[1].get(i).max);
+
+                if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
+                    if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
+                            globalMinimaIndexFav == globalMinimaIndexUnFav ||
+                            globalMaxIndexFav > globalMinimaIndexUnFav ||
+                            globalMinimaIndexFav > globalMaxIndexUnFav) {
+                        continue;
+                    }
+                } else {
+                    System.out.println(globalFacility[0].get(i).i + globalFacility[0].get(i).j);
+                }
+            }
+
+            // Step-4 Algorithm - Global Skyline Objects
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
             System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
@@ -390,28 +510,10 @@ class GaskySequential {
         }
     }
 
-    private static double[][][] initializeArray(int numberOfFacilities, int m, int n) {
-        double[][][] facilityGrid = new double[numberOfFacilities][m][n];
-        java.util.Random rand = new java.util.Random(System.currentTimeMillis());
-
-        for (int facility = 0; facility < numberOfFacilities; facility++) {
-            for (int i = 0; i < m; i++) {
-                for (int j = 0; j < n; j++) {
-
-                    facilityGrid[facility][i][j] = 0;
-
-                    if (rand.nextDouble() < 0.1) {
-                        facilityGrid[facility][i][j] = 1;
-                    }
-                }
-            }
-        }
-        return facilityGrid;
-    }
-
     private static double[][][] initializeArray(int numberOfFacilities, int m, int n, String filePath)
             throws IOException {
         double[][][] facilityGrid = new double[numberOfFacilities][m][n];
+        int facilityIndex;
 
         try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
             String line;
@@ -420,7 +522,7 @@ class GaskySequential {
 
                 // Read facility name, row, and grid values
                 String facilityName = tokenizer.nextToken();
-                int row = Integer.parseInt(tokenizer.nextToken()) - 1; // Adjusted for 0-based indexing
+                int row = Integer.parseInt(tokenizer.nextToken()) - 1;
 
                 // the grid values are in the format "00000000"
                 String gridValues = tokenizer.nextToken();
@@ -432,7 +534,12 @@ class GaskySequential {
                 }
 
                 // Populate the facilityGrid array
-                int facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1; // Adjusted for 0-based indexing
+                if (facilityName.contains("-")) {
+                    facilityIndex = Integer.parseInt(facilityName.substring(1, 2)) - 1;
+
+                } else {
+                    facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1;
+                }
 
                 for (int j = 0; j < n; j++) {
                     facilityGrid[facilityIndex][row][j] = rowValues[j];
