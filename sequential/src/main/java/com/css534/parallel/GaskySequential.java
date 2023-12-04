@@ -1,5 +1,6 @@
 package com.css534.parallel;
 
+
 import java.io.BufferedReader;
 import java.io.Console;
 import java.io.FileReader;
@@ -432,11 +433,13 @@ class GaskySequential {
                     Double local_max_val = Double.MIN_VALUE;
                     Minmax minmax = new Minmax();
                     for (int k = 0; k < fav; k++) {
-                        minmax.min = Double.min(local_min_val, FavourableFacilityGrid[k][i][j]);
-                        minmax.max = Double.min(local_max_val, FavourableFacilityGrid[k][i][j]);
+                        local_min_val = Double.min(local_min_val, FavourableFacilityGrid[k][i][j]);
+                        local_max_val = Double.max(local_max_val, FavourableFacilityGrid[k][i][j]);
                     }
                     minmax.i = i;
                     minmax.j = j;
+                    minmax.min = local_min_val;
+                    minmax.max = local_max_val;
                     minmaxFavList.add(minmax);
                 }
             }
@@ -449,11 +452,13 @@ class GaskySequential {
                     Double local_max_val = Double.MIN_VALUE;
                     Minmax minmax = new Minmax();
                     for (int k = 0; k < unfav; k++) {
-                        minmax.min = Double.min(local_min_val, UnFavourableFacilityGrid[k][i][j]);
-                        minmax.max = Double.min(local_max_val, UnFavourableFacilityGrid[k][i][j]);
+                        local_min_val = Double.min(local_min_val, UnFavourableFacilityGrid[k][i][j]);
+                        local_max_val = Double.max(local_max_val, UnFavourableFacilityGrid[k][i][j]);
                     }
                     minmax.i = i;
                     minmax.j = j;
+                    minmax.min = local_min_val;
+                    minmax.max = local_max_val;
                     minmaxUnFavList.add(minmax);
                 }
             }
@@ -467,13 +472,15 @@ class GaskySequential {
             // iterate over minmaxFavList and add item to globalFacility
             for (Minmax minmax : minmaxFavList) {
                 globalFacility[0].add(minmax);
+                System.out.println("fav min max" + minmax.min + " "  + minmax.max);
             }
 
             for (Minmax minmax : minmaxUnFavList) {
                 globalFacility[1].add(minmax);
+                System.out.println("unfav min max" + minmax.min + " "  + minmax.max);
             }
 
-            for (int i = 0; i < globalFacility.length; i++) {
+            for (int i = 0; i < globalFacility[0].size(); i++) {
                 double globalMaxIndexFav = Double.MIN_VALUE;
                 double globalMaxIndexUnFav = Double.MIN_VALUE;
 
