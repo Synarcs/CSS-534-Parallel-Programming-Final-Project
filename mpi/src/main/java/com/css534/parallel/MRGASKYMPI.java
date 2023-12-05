@@ -23,7 +23,6 @@ import java.util.stream.Collectors;
 import mpi.*;
 
 class MRGASKYMPI {
-    private static boolean debug = false;
     public static class Minmax implements Serializable {
         double min;
         double max;
@@ -465,7 +464,7 @@ class MRGASKYMPI {
             }
 
             if (rank == 0) {
-                Minmax[][] minmaxFavArray = new Minmax[size-1][m * n];
+                Minmax[][] minmaxFavArray = new Minmax[size - 1][m * n];
                 Minmax[][] minmaxUnFavArray = new Minmax[1][m * n];
 
                 minmaxFavArray[0] = minmaxArray;
@@ -478,24 +477,32 @@ class MRGASKYMPI {
                     minmaxFavArray[sourceRank] = minmaxArray;
                 }
 
+                // print out size of minmaxFavArray
+                System.out.println("minmaxFavArray[0] size: " + minmaxFavArray[0].length);
+                System.out.println("minmaxFavArray[1] size: " + minmaxFavArray[1].length);
+
                 // print out the minmaxFavArray
                 for (int i = 0; i < minmaxFavArray.length; i++) {
-                    System.out.println("minmaxFavArray[" + i + "]: " + minmaxArray[i].min + " " + minmaxArray[i].max
-                            + " " + minmaxArray[i].i + " " + minmaxArray[i].j);
+                    for (int j = 0; j < m * n; j++) {
+                        System.out.println("minmaxFavArray[" + i + "]: " + minmaxFavArray[i][j].min + " " + minmaxFavArray[i][j].max
+                                + " " + minmaxFavArray[i][j].i + " " + minmaxFavArray[i][j].j);
+                    }
+
                 }
 
+                Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, size - 1, 0);
+                minmaxUnFavArray[0] = minmaxArray;
 
-                for (int sourceRank = size - 1; sourceRank < size; sourceRank++) {
-                    Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, sourceRank, 0);
-                    minmaxUnFavArray[0] = minmaxArray;
-                }
+                System.out.println("minmaxUnFavArray size: " + minmaxFavArray.length);
 
                 // print out the minmaxUnFavArray
-                for (int i = 0; i < minmaxFavArray.length; i++) {
-                    System.out.println("minmaxUnFavArray[" + i + "]: " + minmaxArray[i].min + " " + minmaxArray[i].max
-                            + " " + minmaxArray[i].i + " " + minmaxArray[i].j);
-                }
+                for (int i = 0; i < minmaxUnFavArray.length; i++) {
+                    for (int j = 0; j < m * n; j++) {
+                        System.out.println("minmaxUnFavArray[" + i + "]: " + minmaxUnFavArray[i][j].min + " " + minmaxUnFavArray[i][j].max
+                                + " " + minmaxUnFavArray[i][j].i + " " + minmaxUnFavArray[i][j].j);
+                    }
 
+                }
             } else {
                 System.out.println("sending from Rank " + rank + ": " + Arrays.toString(minmaxArray));
 
@@ -505,8 +512,7 @@ class MRGASKYMPI {
             // add barrier
             MPI.COMM_WORLD.Barrier();
 
-            if (rank == 0)
-            {
+            if (rank == 0) {
                 // Final global skyline operation here
                 System.out.println("implement final global skyline operation here");
             }
@@ -626,4 +632,5 @@ class MRGASKYMPI {
         }
         return dist_right_left;
     }
+
 }
