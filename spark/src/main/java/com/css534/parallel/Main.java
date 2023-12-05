@@ -8,15 +8,14 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Int;
+import scala.Serializable;
 import scala.Tuple2;
 
-import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import javax.sound.midi.SysexMessage;
 
-public class Main {
+public class Main implements Serializable {
     private final static int clusterSize = 4;
     private final static boolean DEBUG = false;
     private static Logger log = LoggerFactory.getLogger(Main.class);

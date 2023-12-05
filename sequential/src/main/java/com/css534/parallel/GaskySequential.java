@@ -1,4 +1,4 @@
-package com.css534.parallel;
+//package com.css534.parallel;
 
 
 import java.io.BufferedReader;
@@ -18,8 +18,9 @@ import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 import java.util.stream.Collectors;
 
-class GaskySequential {
+class GaskySequential implements Serializable{
 
+    private static boolean debug = false;
     public static class Minmax {
         double min;
         double max;
@@ -387,8 +388,8 @@ class GaskySequential {
                     // }
 
                     // Output results using rank as identifier
-                    System.out.println("Results from column " + column + ": " +
-                            totalDistances.toString());
+//                    System.out.println("Results from column " + column + ": " +
+//                            totalDistances.toString());
 
                     // store the favourable and unfavourable facility grids
                     for (int row = 0; row < m; row++) {
@@ -401,27 +402,29 @@ class GaskySequential {
                 }
             }
 
-            // print fav and unfav grids
-            for (int facility = 0; facility < fav; facility++) {
-                System.out.println("Favourable Facility Grid " + facility + ":");
-                for (int row = 0; row < m; row++) {
-                    for (int column = 0; column < n; column++) {
-                        System.out.print(FavourableFacilityGrid[facility][row][column] + " ");
+            if (debug){
+                // print fav and unfav grids
+                for (int facility = 0; facility < fav; facility++) {
+                    System.out.println("Favourable Facility Grid " + facility + ":");
+                    for (int row = 0; row < m; row++) {
+                        for (int column = 0; column < n; column++) {
+                            System.out.print(FavourableFacilityGrid[facility][row][column] + " ");
+                        }
+                        System.out.println();
                     }
                     System.out.println();
                 }
-                System.out.println();
-            }
 
-            for (int facility = 0; facility < unfav; facility++) {
-                System.out.println("UnFavourable Facility Grid " + facility + ":");
-                for (int row = 0; row < m; row++) {
-                    for (int column = 0; column < n; column++) {
-                        System.out.print(UnFavourableFacilityGrid[facility][row][column] + " ");
+                for (int facility = 0; facility < unfav; facility++) {
+                    System.out.println("UnFavourable Facility Grid " + facility + ":");
+                    for (int row = 0; row < m; row++) {
+                        for (int column = 0; column < n; column++) {
+                            System.out.print(UnFavourableFacilityGrid[facility][row][column] + " ");
+                        }
+                        System.out.println();
                     }
                     System.out.println();
                 }
-                System.out.println();
             }
 
             // Step-3 Algorithm - Global Skyline Objects
@@ -434,7 +437,7 @@ class GaskySequential {
                     Minmax minmax = new Minmax();
                     for (int k = 0; k < fav; k++) {
                         local_min_val = Double.min(local_min_val, FavourableFacilityGrid[k][i][j]);
-                        local_max_val = Double.max(local_max_val, FavourableFacilityGrid[k][i][j]);
+                        local_max_val = Double.min(local_max_val, FavourableFacilityGrid[k][i][j]);
                     }
                     minmax.i = i;
                     minmax.j = j;
@@ -463,35 +466,37 @@ class GaskySequential {
                 }
             }
 
-            @SuppressWarnings("unchecked")
-            List<Minmax> globalFacility[] = new ArrayList[2];
 
-            for (int i = 0; i < globalFacility.length; i++)
-                globalFacility[i] = new ArrayList<>();
-
-            // iterate over minmaxFavList and add item to globalFacility
-            for (Minmax minmax : minmaxFavList) {
-                globalFacility[0].add(minmax);
-                System.out.println("fav min max" + minmax.min + " "  + minmax.max);
+            boolean isEqual = minmaxUnFavList.size() == minmaxFavList.size();
+            if (isEqual) {
+                boolean isGrid = minmaxUnFavList.size() == m * n;
+                if (!isGrid) return;
+            }else {
+                System.out.println("error incorrect order of teh grid projected");
+                return;
             }
 
-            for (Minmax minmax : minmaxUnFavList) {
-                globalFacility[1].add(minmax);
-                System.out.println("unfav min max" + minmax.min + " "  + minmax.max);
+            if (debug){
+                System.out.println("min and max index 1  , 1 " + minmaxFavList.get(0).min + " " + minmaxFavList.get(0).max);
+                System.out.println("min and max index 1  , 1 " + minmaxUnFavList.get(0).min + " " + minmaxUnFavList.get(0).max);
+                System.out.println("the status for them is " + isEqual);
             }
 
-            for (int i = 0; i < globalFacility[0].size(); i++) {
-                double globalMaxIndexFav = Double.MIN_VALUE;
-                double globalMaxIndexUnFav = Double.MIN_VALUE;
+            // the index at i, i holds the facility distance mini and max across all the facility
+//            (1,1),,,,[(0,1.4142135623730951), (1,3.1622776601683795), (1,3.1622776601683795)] // same as key value reduced in saprk
+//            the only difference is its combined
 
-                double globalMinimaIndexFav = Double.MAX_VALUE;
-                double globalMinimaIndexUnFav = Double.MAX_VALUE;
+            // O (N)
+            for (int i=0 ; i < m * n ; i++){
+                // use the struct for faster memory processing as compared o memory jumps required for a 2d array case
+                double globalMaxIndexFav = minmaxFavList.get(i).max;
+                double globalMinimaIndexFav = minmaxFavList.get(i).min;
+                int favi = minmaxFavList.get(i).i + 1; int favj = minmaxFavList.get(i).j + 1;
 
-                globalMinimaIndexFav = Double.min(globalMinimaIndexFav, globalFacility[0].get(i).min);
-                globalMaxIndexFav = Double.min(globalMaxIndexFav, globalFacility[0].get(i).max);
-
-                globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, globalFacility[1].get(i).min);
-                globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, globalFacility[1].get(i).max);
+                double globalMinimaIndexUnFav = minmaxUnFavList.get(i).min;
+                double globalMaxIndexUnFav = minmaxUnFavList.get(i).max;
+//                int ui = minmaxUnFavList.get(i).i; int uf = minmaxUnFavList.get(i).j;
+                // ui, uf will have same value as of favi
 
                 if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
                     if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
@@ -499,9 +504,9 @@ class GaskySequential {
                             globalMaxIndexFav > globalMinimaIndexUnFav ||
                             globalMinimaIndexFav > globalMaxIndexUnFav) {
                         continue;
+                    } else {
+                        System.out.println(favi + " " + favj);
                     }
-                } else {
-                    System.out.println(globalFacility[0].get(i).i + globalFacility[0].get(i).j);
                 }
             }
 

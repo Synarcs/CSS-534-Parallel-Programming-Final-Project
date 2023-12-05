@@ -23,6 +23,7 @@ import java.util.stream.Collectors;
 import mpi.*;
 
 class MRGASKYMPI {
+    private static boolean debug = false;
     public static class Minmax implements Serializable {
         double min;
         double max;

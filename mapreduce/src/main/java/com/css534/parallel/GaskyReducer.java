@@ -13,6 +13,8 @@ import java.io.IOException;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.css534.parallel.DelimeterRegexConsts.*;
+
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
     private final String maxRangeValue = "1.7976931348623157E308";
@@ -135,7 +137,9 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
 
             log.info("The current remained dominated points are");
             List<double[]> proximityProjectionsPoints = findProximityPoints(points);
-            List<Double> testData = proximityProjectionsPoints.stream().map((i) -> i[0]).collect(Collectors.toList());
+            if (DEBUG){
+                List<Double> testData = proximityProjectionsPoints.stream().map((i) -> i[0]).collect(Collectors.toList());
+            }
 
             int unDominatedPointsSize = points.size();
             int proximityIntervals = proximityProjectionsPoints.size() - 1;

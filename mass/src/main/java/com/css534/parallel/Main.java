@@ -14,24 +14,13 @@ public class Main {
         MASS.getLogger().debug("Successfully Initialized MASS");
 
         MASS.getLogger().debug("Initiating the places Grid across the grid");
-        Places spatialGrid = new Places(1, SkylineGridPlaces.class.getName(), (Object) new Integer(0),
+        Places spatialGrid = new Places(1, SkylineGridPlaces.class.getName(), (Object) 0,
                             gridX, gridY, facilityCount);
 
-        MASS.getLogger().debug("Initiating all the grid placess with binary matrix value");
-        Object[] globalBinaryGrid = new Object[gridY * gridY * facilityCount];;
+//        spatialGrid.exchangeAll();
 
-        spatialGrid.callAll(INIT, globalBinaryGrid);
-        MASS.getLogger().debug("Initialization done for the skyline object grid");
-
-
-        int totalSpatialgridSize = spatialGrid.getPlacesSize();
-
-        Place[] distributedArray = spatialGrid.getPlaces();
-
-
-        for (int i=0; i < facilityCount; i++){
-
-        }
+        int agentsRequiredPopulation = gridX * facilityCount;
+        Agents touristAgent = new Agents(1, SkylineAgent.class.getName(), (Object) 0, spatialGrid,agentsRequiredPopulation);
 
         MASS.finish();
     }

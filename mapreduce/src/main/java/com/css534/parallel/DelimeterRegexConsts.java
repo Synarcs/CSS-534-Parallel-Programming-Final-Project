@@ -10,4 +10,6 @@ public class DelimeterRegexConsts implements Serializable {
 
     public final static Integer UNFAVOURABLE_POSITION = 0;
     public final static int FACILITY_COUNT = 2;
+
+    public final static boolean DEBUG = false;
 }
