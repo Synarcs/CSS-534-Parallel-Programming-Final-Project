@@ -1,4 +1,3 @@
-
 package com.css534.parallel;
 
 import java.io.BufferedReader;
@@ -435,7 +434,8 @@ class MRGASKYMPI {
             }
 
             // Step-3 Algorithm - Global Skyline Objects
-            List<Minmax> minmaxList = new ArrayList<>();
+            Minmax[] minmaxArray = new Minmax[m * n];
+            int index = 0;
 
             for (int i = 0; i < m; i++) {
                 for (int j = 0; j < n; j++) {
@@ -443,71 +443,73 @@ class MRGASKYMPI {
                     Double local_max_val = Double.MIN_VALUE;
                     Minmax minmax = new Minmax();
                     for (int k = 0; k < facilitiesPerRank; k++) {
-                        // print i,j,k,rank
-                        System.out.println("i:" + i + " j:" + j + " k:" + k + " rank:" + rank);
-                        minmax.min = Double.min(local_min_val, FacilityGrid[k][i][j]);
-                        minmax.max = Double.min(local_max_val, FacilityGrid[k][i][j]);
+                        local_min_val = Double.min(local_min_val, FacilityGrid[k][i][j]);
+                        local_max_val = Double.max(local_max_val, FacilityGrid[k][i][j]);
                     }
                     minmax.i = i;
                     minmax.j = j;
-                    minmaxList.add(minmax);
+                    minmax.min = local_min_val;
+                    minmax.max = local_max_val;
+                    minmaxArray[index++] = minmax;
                 }
             }
 
             // add barrier
             MPI.COMM_WORLD.Barrier();
 
-            // print minmaxList
-            for (Minmax minmax : minmaxList) {
-
+            // print minmaxArray
+            for (Minmax minmax : minmaxArray) {
                 System.out.println("Rank:" + rank + " Min:" + minmax.min + " Max:" + minmax.max + " i:" + minmax.i
                         + " j:" + minmax.j);
             }
 
-            if (rank != 0) {
-                try {
-                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
-                    ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+            if (rank == 0) {
+                Minmax[][] minmaxFavArray = new Minmax[size-1][m * n];
+                Minmax[][] minmaxUnFavArray = new Minmax[1][m * n];
 
-                    objectOutputStream.writeObject(minmaxList);
+                minmaxFavArray[0] = minmaxArray;
+                // Rank 0 receives data from other ranks
+                for (int sourceRank = 1; sourceRank < size - 1; sourceRank++) {
+                    Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, sourceRank, 0);
 
-                    byte[] serializedData = byteArrayOutputStream.toByteArray();
+                    // Process the received data or store it as needed
+                    System.out.println("Received from Rank " + sourceRank + ": " + Arrays.toString(minmaxArray));
+                    minmaxFavArray[sourceRank] = minmaxArray;
+                }
 
-                    MPI.COMM_WORLD.Send(serializedData, 0, serializedData.length, MPI.BYTE, 0, 0);
+                // print out the minmaxFavArray
+                for (int i = 0; i < minmaxFavArray.length; i++) {
+                    System.out.println("minmaxFavArray[" + i + "]: " + minmaxArray[i].min + " " + minmaxArray[i].max
+                            + " " + minmaxArray[i].i + " " + minmaxArray[i].j);
+                }
 
-                } catch (IOException e) {
-                    e.printStackTrace();
+
+                for (int sourceRank = size - 1; sourceRank < size; sourceRank++) {
+                    Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, sourceRank, 0);
+                    minmaxUnFavArray[0] = minmaxArray;
+                }
+
+                // print out the minmaxUnFavArray
+                for (int i = 0; i < minmaxFavArray.length; i++) {
+                    System.out.println("minmaxUnFavArray[" + i + "]: " + minmaxArray[i].min + " " + minmaxArray[i].max
+                            + " " + minmaxArray[i].i + " " + minmaxArray[i].j);
                 }
 
             } else {
-                // Rank 0 receives the List<Minmax> from non-0 ranks
-                List<Minmax> receivedList = new ArrayList<>();
+                System.out.println("sending from Rank " + rank + ": " + Arrays.toString(minmaxArray));
 
-                for (int i = 1; i < MPI.COMM_WORLD.Size(); i++) {
-                    Status status = MPI.COMM_WORLD.Recv(null, 0, MPI.BYTE, i, 0);
-
-                    byte[] receivedData = new byte[status.getCount(MPI.BYTE)];
-
-                    MPI.COMM_WORLD.Recv(receivedData, 0, receivedData.length, MPI.BYTE, i, 0);
-
-                    try {
-                        ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream(receivedData);
-                        ObjectInputStream objectInputStream = new ObjectInputStream(byteArrayInputStream);
-
-                        List<Minmax> sublist = (List<Minmax>) objectInputStream.readObject();
-                        receivedList.addAll(sublist);
-
-                    } catch (IOException | ClassNotFoundException e) {
-                        e.printStackTrace();
-                    }
-                }
-
-                // Process the receivedList on rank 0
-                for (Minmax minmax : receivedList) {
-                    System.out.println("Received Minmax: min=" + minmax.min + ", max=" + minmax.max +
-                            ", i=" + minmax.i + ", j=" + minmax.j);
-                }
+                MPI.COMM_WORLD.Send(minmaxArray, 0, 1, MPI.OBJECT, 0, 0);
             }
+
+            // add barrier
+            MPI.COMM_WORLD.Barrier();
+
+            if (rank == 0)
+            {
+                // Final global skyline operation here
+                System.out.println("implement final global skyline operation here");
+            }
+
             long endTime = System.currentTimeMillis();
             long elapsedTime = endTime - startTime;
 
@@ -623,5 +625,4 @@ class MRGASKYMPI {
         }
         return dist_right_left;
     }
-
 }
