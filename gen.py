@@ -8,7 +8,11 @@ parser = ArgumentParser()
 def generateFacilitiesData(facilitySize, gridSize):
     data = list()
 
-    prefix_list = ['F' + str(i) for i in range(1, facilitySize + 1)]
+    favSize = int(facilitySize / 2)
+    unFavSize = int(facilitySize / 2)
+
+    prefix_list = ['F' + str(i) for i in range(1, favSize + 1)]
+    prefix_list = prefix_list + ['F' + str(i)+"-" for i in range(favSize + 1, facilitySize + 1)]
     for prefix in prefix_list:
         for i in range(1, gridSize + 1):
             value = format(random.randint(0, 1 << int(gridSize/2)), '0{0}b'.format(gridSize))

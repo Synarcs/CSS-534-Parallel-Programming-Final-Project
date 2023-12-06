@@ -338,6 +338,7 @@ class GaskySequential implements Serializable{
             }
 
             // Step-2 Algorithm
+            // optimized algorithm implemented only for parallel purpose
             for (int facility = 0; facility < numberOfFacilities; facility++) {
                 for (int column = 0; column < n; column++) {
                     // Get ordered row values for this rank
@@ -548,7 +549,6 @@ class GaskySequential implements Serializable{
                 // Populate the facilityGrid array
                 if (facilityName.contains("-")) {
                     facilityIndex = Integer.parseInt(facilityName.substring(1, 2)) - 1;
-
                 } else {
                     facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1;
                 }
