@@ -18,7 +18,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
-import java.util.stream.Collectors;
 
 import mpi.*;
 
@@ -28,6 +27,7 @@ class MRGASKYMPI {
         double max;
         int i;
         int j;
+        Minmax(double min, double max, int i, int j){this.min = min; this.max = max; this.i = i; this.j = j;}
     }
 
     public static class Vector2f {
@@ -477,7 +477,7 @@ class MRGASKYMPI {
                     minmaxFavArray[sourceRank] = minmaxArray;
                 }
 
-                // print out size of minmaxFavArray
+                // print out size of minmaxFavArrayx
                 System.out.println("minmaxFavArray[0] size: " + minmaxFavArray[0].length);
                 System.out.println("minmaxFavArray[1] size: " + minmaxFavArray[1].length);
 
@@ -487,9 +487,9 @@ class MRGASKYMPI {
                         System.out.println("minmaxFavArray[" + i + "]: " + minmaxFavArray[i][j].min + " " + minmaxFavArray[i][j].max
                                 + " " + minmaxFavArray[i][j].i + " " + minmaxFavArray[i][j].j);
                     }
-
                 }
 
+                // Get Unfavourable Array from last index
                 Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, size - 1, 0);
                 minmaxUnFavArray[0] = minmaxArray;
 
@@ -502,19 +502,74 @@ class MRGASKYMPI {
                                 + " " + minmaxUnFavArray[i][j].i + " " + minmaxUnFavArray[i][j].j);
                     }
 
+
+                    // minmaxFav size is (size - 1) * (m * n) not (m * n)
+                    // each index represents flatten index i , j
+                    List<Minmax> globalFavFlattened = new ArrayList<>();
+                    List<Minmax> globalUnFavFlattened = new ArrayList<>();
+
+                    for (int j = 0; j < m * n; j++) {
+                        double globalMaxIndexFav = Double.MIN_VALUE;
+                        double globalMinimaIndexFav = Double.MAX_VALUE;
+                        int row = 0; int column = 0;
+                        for (int favFacilityCount = 0; favFacilityCount < minmaxFavArray.length; favFacilityCount++) {
+                            globalMaxIndexFav = Double.min(globalMaxIndexFav, minmaxFavArray[j][favFacilityCount].max);
+                            globalMinimaIndexFav = Double.min(globalMinimaIndexFav, minmaxFavArray[j][favFacilityCount].min);
+                            row = minmaxFavArray[j][favFacilityCount].i;
+                            column = minmaxFavArray[j][favFacilityCount].j;
+                        }
+                        globalFavFlattened.add(
+                                new Minmax(globalMinimaIndexFav, globalMaxIndexFav, row, column)
+                        );
+                    }
+
+                    for (int j = 0; j < m * n; j++){
+                        double globalMaxIndexUnFav = Double.MIN_VALUE;
+                        double globalMinimaIndexUnFav = Double.MAX_VALUE;
+                        int row = 0; int column = 0;
+                        for (int unfavFacilityCount=0; unfavFacilityCount < minmaxUnFavArray.length; unfavFacilityCount++){
+                            globalMaxIndexUnFav = Double.min(globalMaxIndexUnFav, minmaxUnFavArray[j][unfavFacilityCount].max);
+                            globalMinimaIndexUnFav = Double.max(globalMinimaIndexUnFav, minmaxUnFavArray[j][unfavFacilityCount].min);
+                            row = minmaxFavArray[j][unfavFacilityCount].i;
+                            column = minmaxFavArray[j][unfavFacilityCount].j;
+                        }
+                        globalUnFavFlattened.add(
+                                new Minmax(globalMaxIndexUnFav, globalMinimaIndexUnFav, row, column)
+                        );
+                    }
+
+                    assert globalFavFlattened.size() == globalUnFavFlattened.size();
+
+                    // done globally reducing and flattening and reducing at the rank 0 for process.
+                    // O (N)
+                    for (int i=0 ; i < m * n ; i++){
+                        // use the struct for faster memory processing as compared o memory jumps required for a 2d array case
+                        double globalMaxIndexFav = globalFavFlattened.get(i).max;
+                        double globalMinimaIndexFav = globalFavFlattened.get(i).min;
+                        int favi = globalFavFlattened.get(i).i + 1; int favj = globalFavFlattened.get(i).j + 1;
+
+                        double globalMinimaIndexUnFav = globalUnFavFlattened.get(i).min;
+                        double globalMaxIndexUnFav = globalUnFavFlattened.get(i).max;
+//                int ui = minmaxUnFavList.get(i).i; int uf = minmaxUnFavList.get(i).j;
+                        // ui, uf will have same value as of favi
+
+                        if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
+                            if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
+                                    globalMinimaIndexFav == globalMinimaIndexUnFav ||
+                                    globalMaxIndexFav > globalMinimaIndexUnFav ||
+                                    globalMinimaIndexFav > globalMaxIndexUnFav) {
+                                continue;
+                            } else {
+                                System.out.println(favi + " " + favj);
+                            }
+                        }
+                    }
+
+
                 }
             } else {
                 System.out.println("sending from Rank " + rank + ": " + Arrays.toString(minmaxArray));
-
                 MPI.COMM_WORLD.Send(minmaxArray, 0, 1, MPI.OBJECT, 0, 0);
-            }
-
-            // add barrier
-            MPI.COMM_WORLD.Barrier();
-
-            if (rank == 0) {
-                // Final global skyline operation here
-                System.out.println("implement final global skyline operation here");
             }
 
             long endTime = System.currentTimeMillis();
