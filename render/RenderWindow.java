@@ -72,6 +72,7 @@ public class RenderWindow extends JFrame implements Runnable {
                 if (row == gridSize)
                     row = 0;
             }
+            System.out.println("Read the file closing the file pointer");
             br.close();
         } catch (IOException e) {
             e.printStackTrace();
@@ -82,7 +83,7 @@ public class RenderWindow extends JFrame implements Runnable {
 
     public RenderWindow(String[] args, String filename, String outputFIle) {
         setTitle("Area Skyline Grid");
-        setSize(600, 480);
+        setSize(1920, 1080);
         readFile(filename, args);
         // readOutputFile(outputFIle);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -96,31 +97,40 @@ public class RenderWindow extends JFrame implements Runnable {
                 cellLabel.setVerticalAlignment(JLabel.CENTER);
                 cellLabel.setOpaque(true);
 
-                if (binaryGrid[row][col] == 1) {
-                    cellLabel.setBackground(Color.GREEN);
-                } else if (binaryGrid[row][col] == -1) {
-                    cellLabel.setBackground(Color.RED);
-                } else {
-                    cellLabel.setBackground(Color.WHITE);
-                }
-
-                cellLabel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
-                cellLabel.setText("(" + (row + 1) + "," + (col + 1) + ")");
-
-                // Add a mouse listener to change the color on click
-                cellLabel.addMouseListener(new MouseAdapter() {
-                    @Override
-                    public void mouseClicked(MouseEvent e) {
-                        cellLabel.setBackground(Color.ORANGE);
+                if (binaryGrid.length <= (1 << 8)){
+                    if (binaryGrid[row][col] == 1) {
+                        cellLabel.setBackground(Color.GREEN);
+                    } else if (binaryGrid[row][col] == -1) {
+                        cellLabel.setBackground(Color.RED);
+                    } else {
+                        cellLabel.setBackground(Color.WHITE);
                     }
-                });
+
+                    cellLabel.setBorder(BorderFactory.createLineBorder(Color.BLACK));
+                    cellLabel.setText("(" + (row + 1) + "," + (col + 1) + ")");
+
+                    // Add a mouse listener to change the color on click
+                    cellLabel.addMouseListener(new MouseAdapter() {
+                        @Override
+                        public void mouseClicked(MouseEvent e) {
+                            cellLabel.setBackground(Color.ORANGE);
+                        }
+                    });
+                }else {
+                    cellLabel.setText(String.valueOf(col));
+                }
 
                 gridPanel.add(cellLabel);
             }
         }
 
+        System.out.println("Components added"); // Add this line
+
         add(gridPanel);
+        pack();
         setLocationRelativeTo(null);
+
+        System.out.println("Frame properties set"); // Add
     }
 
     public static void main(String[] args) {

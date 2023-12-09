@@ -7,7 +7,6 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.Int;
 import scala.Serializable;
 import scala.Tuple2;
 
@@ -89,8 +88,8 @@ public class Main implements Serializable {
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
 
         if (totalPoints > 2) {
-            log.info("The current length of the un dominated grids is" + totalPoints);
-            log.info("This is a non implemented method yet");
+            System.out.println("The current length of the un dominated grids is" + totalPoints);
+            System.out.println("This is a non implemented method yet");
 
             List<Tuple2<Double, Double>> points = new LinkedList<>();
 
@@ -117,7 +116,7 @@ public class Main implements Serializable {
                 }
             }
 
-            log.info("The current remained dominated points are");
+            System.out.println("The current remained dominated points are");
             List<double[]> proximityProjectionsPoints = findProximityPoints(points, gridSize);
             List<Double> testData = proximityProjectionsPoints.stream().map((i) -> i[0]).collect(Collectors.toList());
 
@@ -295,7 +294,7 @@ public class Main implements Serializable {
 
         try {
             JavaSparkContext sc = new JavaSparkContext(conf);
-            sc.setLogLevel("WARN");
+            sc.setLogLevel("ERROR");
 
             int numCores = Integer.parseInt(sc.getConf().get("spark.executor.cores")) *
                     Integer.parseInt(sc.getConf().get("spark.executor.cores"));
@@ -306,15 +305,20 @@ public class Main implements Serializable {
 
             // read the file from hdfs later
             JavaRDD<String> inputData = sc.textFile(fileName).repartition(numCores);
+            // hdfs://cssmpi1h.uwb.edu:28250/user/vedpar/parallel/input
+
 
             System.out.println("the grid size for the skyline objects is " + Integer.parseInt(args[1]));
 
+            System.out.println("Parallel Processing of Local Skyline Started");
             JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Double, Double>>> data = inputData
                     .flatMapToPair(fileLine -> parseInputData(fileLine))
                     .groupByKey();
 
-            System.out.println("value for the data is" + data.count());
 
+            System.out.println("Parallely Transformed total tuples " + data.count());
+
+            System.out.println("Ordering the Row Projections for each column");
             data = data.mapValues((Iterable<Tuple2<Double, Double>> iterable) -> {
                 List<Tuple2<Double, Double>> list = new ArrayList<>();
                 iterable.forEach(list::add);
@@ -322,6 +326,7 @@ public class Main implements Serializable {
                 return list;
             });
 
+            System.out.println("Filtering out highly dominated points by others Max Distance from X Axis");
             data = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
                 List<Tuple2<Double, Double>> filteredValue = new ArrayList<>();
                 for (Tuple2<Double, Double> value : columnProjection) {
@@ -351,6 +356,7 @@ public class Main implements Serializable {
                 });
 
 
+            System.out.println("Running the MrGaskY Algorithm");
             JavaPairRDD<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> mergedGlobalReduce =
                     colProjections.flatMapToPair((Tuple2<Tuple2<String, Integer>, List<Double>> value) -> {
                         Tuple2<String, Integer> key = value._1();
@@ -393,11 +399,11 @@ public class Main implements Serializable {
                 });
             }
 
-            System.out.println("Applying global Skyline Point Reduction on grid");
 
+            System.out.println("Applying global Skyline Point Reduction on grid");
             if (DEBUG)
                 mergedGlobalReduce.collect().forEach((reducedProjections) -> {
-                    System.out.println(reducedProjections._1() + ",,,," + reducedProjections._2());
+                    log.info(reducedProjections._1() + ",,,," + reducedProjections._2());
                 });
 
             // did not use flatmapto pair for memory efficienty and less requirement for shuffle sort on the rdd
@@ -452,7 +458,7 @@ public class Main implements Serializable {
 
             if (DEBUG)
                 filterDominantGlobalPoints.collect().forEach((reducedProjections) -> {
-                    System.out.println(reducedProjections._1() + "<--->" + reducedProjections._2());
+                    log.info(reducedProjections._1() + "<--->" + reducedProjections._2());
                 });
 
 
@@ -468,6 +474,7 @@ public class Main implements Serializable {
                 );
             });
 
+            log.info("Projecting and Ordering the final Result for the coordinate projections");
             JavaPairRDD<Integer, Integer> orderedCoordinateProjection = transformedCoordinates.sortByKey()
                     .groupByKey()
                     .mapValues((orderedColumnProjection) -> {
@@ -490,16 +497,18 @@ public class Main implements Serializable {
                             );
                         }
                         return resultOdering.iterator();
-                    });
+                    }).sortByKey();
 
 
-            orderedCoordinateProjection.collect().forEach((reducedProjections) -> {
-                // projecting the final orderProjection of coordinates
-                System.out.println(
-                        reducedProjections._1() + "  " + reducedProjections._2()
-                );
-            });
-
+            orderedCoordinateProjection.coalesce(1).saveAsTextFile("output");
+            if (DEBUG){
+                 orderedCoordinateProjection.collect().forEach((reducedProjections) -> {
+                     // projecting the final orderProjection of coordinates
+                     System.out.println(
+                             reducedProjections._1() + "  " + reducedProjections._2()
+                     );
+                 });
+            }
             System.out.println("Elasped Time: " + (System.currentTimeMillis() - startTime));
         }catch (Exception exception){
             System.out.println("error in processing the spark context");

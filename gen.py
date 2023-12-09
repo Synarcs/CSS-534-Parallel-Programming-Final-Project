@@ -7,15 +7,19 @@ parser = ArgumentParser()
 
 def generateFacilitiesData(facilitySize, gridSize):
     data = list()
+    facilitySizeFav = int(facilitySize / 2)
+    facilitySizeUnFav = int(facilitySize / 2)
 
-    favSize = int(facilitySize / 2)
-    unFavSize = int(facilitySize / 2)
-
-    prefix_list = ['F' + str(i) for i in range(1, favSize + 1)]
-    prefix_list = prefix_list + ['F' + str(i)+"-" for i in range(favSize + 1, facilitySize + 1)]
+    prefix_list = ['F' + str(i) for i in range(1, facilitySizeFav + 1)]
+    prefix_list = prefix_list + ['F' + str(i)+'-' for i in range(facilitySizeUnFav + 1, facilitySize + 1)]
     for prefix in prefix_list:
         for i in range(1, gridSize + 1):
-            value = format(random.randint(0, 1 << int(gridSize/2)), '0{0}b'.format(gridSize))
+            if i == gridSize:
+                value = format(random.randint(0, 1 << int(2)), '0{0}b'.format(gridSize))
+            elif i <= int(gridSize / 4):
+                value = format(random.randint(0, 1 << int(3)), '0{0}b'.format(gridSize))
+            else:
+                value = format(0, '0{0}b'.format(gridSize))
             featureMap = "{0} {1} {2}\n".format(prefix, i, value)
             data.append(featureMap)
 
@@ -33,3 +37,4 @@ if __name__ == "__main__":
         os.remove(os.path.join(os.getcwd(), 'input.txt'))
     with open(os.path.join(os.getcwd(), 'input.txt'), 'w+') as inputGrid:
         inputGrid.writelines(random_data)
+

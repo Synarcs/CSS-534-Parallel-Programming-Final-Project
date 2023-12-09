@@ -7,12 +7,12 @@ import org.apache.hadoop.io.Text;
 import org.apache.hadoop.mapred.*;
 import org.apache.hadoop.mapred.jobcontrol.JobControl;
 
-import com.css534.parallel.base.FacilityCombinerReducerBase;
 
 import java.io.IOException;
+import java.io.Serializable;
 import java.util.Arrays;
 
-public class GaskyJob {
+public class GaskyJob implements Serializable {
 
     private static  JobControl getJobController(){
         return new JobControl("Gasky Algorithm Computation");
