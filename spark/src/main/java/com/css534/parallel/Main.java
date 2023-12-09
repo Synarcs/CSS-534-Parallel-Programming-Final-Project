@@ -446,7 +446,7 @@ public class Main implements Serializable {
                     if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
                             globalMinimaIndexFav == globalMinimaIndexUnFav ||
                             globalMaxIndexFav > globalMinimaIndexUnFav ||
-                            globalMinimaIndexFav > globalMaxIndexUnFav){
+                            globalMinimaIndexFav > globalMaxIndexUnFav) {
                         log.info("The minimum scale object with unFav facility more closer");
                         return false;
                     }else {

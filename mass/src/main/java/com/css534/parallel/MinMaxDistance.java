@@ -1,6 +1,7 @@
 package com.css534.parallel;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 
@@ -9,8 +10,8 @@ public class MinMaxDistance {
 
     private final int FACILITY_CATEGROY = 2;
 
-    public SkylineObject processMinMaxDistanceAlgorithm(Object[] distances, int favCount, int unFavCount,
-                                                        int row, int col) {
+    public boolean processMinMaxDistanceAlgorithm(double[] distances, int favCount, int unFavCount,
+                                                  int row, int col) {
 
         int totalFacilities = favCount + unFavCount;
         List<Double> processGridData[] = new ArrayList[FACILITY_CATEGROY];
@@ -18,14 +19,15 @@ public class MinMaxDistance {
 
         for (int i=0; i < processGridData.length; i++) processGridData[i] = new ArrayList<>();
 
-        for (int i=0 ; i < favCount; i++){
-            processGridData[0].add((double) distances[i]);
-        }
+        // consider the global minmax with distance until fav
+        for (int i=0 ; i < favCount; i++)
+            processGridData[0].add(distances[i]);
 
-        for (int i=unFavCount; i < totalFacilities; i++){
-            processGridData[1].add((double) distances[i - favCount]);
-        }
+        // after the fav index every peice in unfav
+        for (int i=favCount; i < totalFacilities; i++)
+            processGridData[1].add(distances[i]);
 
+        // System.out.println("teh array is " + Arrays.toString(processGridData));
         double globalMaxIndexFav = Double.MIN_VALUE;
         double globalMaxIndexUnFav = Double.MIN_VALUE;
 
@@ -48,11 +50,12 @@ public class MinMaxDistance {
                     globalMinimaIndexFav == globalMinimaIndexUnFav ||
                     globalMaxIndexFav > globalMinimaIndexUnFav ||
                     globalMinimaIndexFav > globalMaxIndexUnFav){
-            }{
-                return null;
+                return false;
+            }else {
+                return true;
             }
-        }else {
-            return new SkylineObject(row, col);
         }
+
+        return false;
     }
 }

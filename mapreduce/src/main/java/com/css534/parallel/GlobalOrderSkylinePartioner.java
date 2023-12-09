@@ -2,6 +2,9 @@ package com.css534.parallel;
 
 import org.apache.hadoop.mapreduce.Partitioner;
 
+/**
+ *  A Custom paritioner written for debug purpose to debug the custom paritioning implementation
+ */
 @SuppressWarnings("unused")
 public class GlobalOrderSkylinePartioner extends Partitioner<GlobalOrderSkylineKey, Object> {
 
