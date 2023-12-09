@@ -82,41 +82,13 @@ public class SkylineGridPlaces extends Place {
 
         int[] gridSizePerFacility = (int[]) facilityName;
 
+        // create the final holder pplace to load all the arrays to the heap for the place thread
         facilityGridPlaces = new double[gridSizePerFacility[0]][gridSizePerFacility[1]];
         gridX = gridSizePerFacility[0];
         gridY = gridSizePerFacility[1];
 
         System.out.println(facilityGridPlaces.length + " " + facilityGridPlaces[0].length + " " + filename);
 
-        String fileName = "input";
-        synchronized (fileName){
-            try (BufferedReader br = new BufferedReader(new FileReader(filename))) {
-                String fileLine;
-                LineNumberReader reader = new LineNumberReader(br);
-                int lineNumber = reader.getLineNumber();
-
-                while ((fileLine = br.readLine()) != null) {
-                    String[] val = fileLine.split("\\s+");
-                    if (val.length == 0 || val[0].indexOf("F") == -1)
-                        throw new RuntimeException("The required file of not correct format for parsing");
-
-                    if (Integer.valueOf(val[0].indexOf("-") == -1 ? val[0].replace("F", "") : String.valueOf(val[0].charAt(1))) == currentFacility){
-                        String binaryIndex = val[val.length - 1];
-
-                        for (int i= 0; i < binaryIndex.length();i ++){
-                            facilityGridPlaces[lineNumber % gridSizePerFacility[0]][i] = Double.valueOf(
-                                    Character.getNumericValue(binaryIndex.charAt(i))
-                            );
-                            if (debug)
-                                System.out.println("For the index " + currentFacility + "value is " + binaryIndex + "distance is " + facilityGridPlaces[lineNumber % gridSizePerFacility[0]][i]);
-                        }
-                    }
-
-                }
-            }catch(IOException exception){
-                exception.printStackTrace();
-            }catch(RuntimeException exception){ exception.printStackTrace(); }
-        }
         return null;
     }
 
@@ -137,13 +109,19 @@ public class SkylineGridPlaces extends Place {
             }
             distanceRowIndex++;
         }
+
+        if (!debug){
+            for (int i = 0; i < gridX; i++){
+                System.out.println(Arrays.toString(distanceGrid[i]));
+            }
+        }
     }
 
     private void computeProximityPolygons(Object argument){
 
     }
 
-    public double test(Object argument){
+    public double loadDistance(Object argument){
 
         System.out.println(argument.getClass().getName() + argument.getClass().getCanonicalName());
         Object[] indexAskedByAgent = (Object[]) argument;
@@ -154,7 +132,7 @@ public class SkylineGridPlaces extends Place {
         try{
             if (distanceGrid == null) throw new RuntimeException("Eror please call agent call before");
             double value = new Random().nextDouble();
-            System.out.println("from the place " + value + " " + getIndex()[0] + " " + getSize()[0]);
+            System.out.println("from the place " + " " + getIndex()[0] + " " + getSize()[0]);
             return distanceGrid[intArray[0]][intArray[1]];
         }catch(RuntimeException exception){
             exception.printStackTrace();
@@ -162,14 +140,46 @@ public class SkylineGridPlaces extends Place {
         }
     }
 
+    public void loadBinaryMatrix(Object argument){
+
+        String[] tokens = (String[]) argument;
+        System.out.println("Binary tokens at this place" + Arrays.toString(tokens) + " " + getIndex()[0]);
+
+        for (int i=0; i < tokens.length; i++){
+            for (int j=0 ; j < tokens[0].length(); j++){
+                facilityGridPlaces[i][j] = Double.valueOf(
+                        Character.getNumericValue(tokens[i].charAt(j)));
+            }
+        }
+
+        if (!debug){
+            System.out.println("for place id " + getIndex()[0]);
+
+            for (int i=0 ; i < facilityGridPlaces.length; i++){
+                System.out.println(Arrays.toString(facilityGridPlaces[i]));
+            }
+        }
+
+
+        return;
+    }
+
+    public void buffer(Object argument) {
+        System.out.println("This place is at" + getIndex()[0] + "  " + getSize());
+        System.out.println(argument.getClass().getCanonicalName());
+        String[] info = (String[]) argument;
+        for (String cc: info) System.out.println(cc);
+    }
 
     @Override
     public Object callMethod(int functionId, Object argument) {
         switch (functionId){
             case 0: { init(argument); break; }
+            case 11: { loadBinaryMatrix(argument); break; }
             case 1: { computeBestAgentDistance(); break; }
             case 2: { computeProximityPolygons(argument); break; }
-            case 3: { return test(argument); }
+            case 3: { return loadDistance(argument); }
+            case 4: { buffer(argument); break;}
             default : { break; }
         }
         return  null;
