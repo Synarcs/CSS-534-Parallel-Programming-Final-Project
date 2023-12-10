@@ -1,12 +1,9 @@
 package com.css534.parallel;
 
+import mpi.*;
 import java.io.BufferedReader;
-import java.io.ByteArrayInputStream;
-import java.io.ByteArrayOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
-import java.io.ObjectInputStream;
-import java.io.ObjectOutputStream;
 import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.ArrayList;
@@ -19,15 +16,472 @@ import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.StringTokenizer;
 
-import mpi.*;
+public class MRGASKYMPI {
 
-class MRGASKYMPI {
+    public static void main(String[] args) throws MPIException {
+        MPI.Init(args);
+
+        int rank = MPI.COMM_WORLD.Rank();
+        int size = MPI.COMM_WORLD.Size();
+
+        if (rank == 0 && args.length != 5) {
+            System.err.println("Usage: java MRGASKYMPI numberOfFacilities size size favourable unfavourable");
+            MPI.Finalize();
+            System.exit(1);
+        }
+
+        int numberOfFacilities = Integer.parseInt(args[0]);
+        int m = Integer.parseInt(args[1]);
+        int n = Integer.parseInt(args[2]);
+        int Fav = Integer.parseInt(args[3]); // Number of favorable facilities
+        int Unfav = Integer.parseInt(args[4]); // Number of unfavorable facilities
+
+        // Calculate the number of ranks that will receive favorable and unfavorable
+        // facilities
+        int numRanksForF = size / 2;
+        int numRanksForU = size - numRanksForF;
+
+        // Arrays to store the distributed facilities for each rank
+        int[] distributedF = new int[numRanksForF];
+        int[] distributedU = new int[numRanksForU];
+
+        // Calculate how many favorable facilities each rank in the first half will
+        // receive
+        int facilitiesPerRankForF = Fav / numRanksForF;
+        // Calculate the remainder of favorable facilities
+        int remainderF = Fav % numRanksForF;
+
+        // Distribute favorable facilities
+        for (int i = 0; i < numRanksForF; i++) {
+            distributedF[i] = facilitiesPerRankForF + (i < remainderF ? 1 : 0);
+        }
+
+        // Calculate how many unfavorable facilities each rank in the second half will
+        // receive
+        int facilitiesPerRankForU = Unfav / numRanksForU;
+        // Calculate the remainder of unfavorable facilities
+        int remainderU = Unfav % numRanksForU;
+
+        // Distribute unfavorable facilities
+        for (int i = 0; i < numRanksForU; i++) {
+            distributedU[i] = facilitiesPerRankForU + (i < remainderU ? 1 : 0);
+        }
+
+        // Gather the distributed facilities to all ranks
+        int[] allDistributedF = new int[numRanksForF * size];
+        int[] allDistributedU = new int[numRanksForU * size];
+
+        MPI.COMM_WORLD.Gather(distributedF, 0, numRanksForF, MPI.INT, allDistributedF, 0, numRanksForF, MPI.INT, 0);
+        MPI.COMM_WORLD.Gather(distributedU, 0, numRanksForU, MPI.INT, allDistributedU, 0, numRanksForU, MPI.INT, 0);
+
+        // MPI.COMM_WORLD.Bcast(distributedF, 0, numRanksForF, MPI.INT, 0);
+        // MPI.COMM_WORLD.Bcast(distributedU, 0, numRanksForU, MPI.INT, 0);
+
+        // Print the result for understnading the distribution
+        if (rank == 0) {
+            System.out.println("Rank  |  Distributed Favorable Facilities");
+            System.out.println("----------------------------------------");
+            for (int i = 0; i < numRanksForF; i++) {
+                System.out.println("  " + i + "        " + allDistributedF[i]);
+            }
+            System.out.println("----------------------------------------");
+
+            System.out.println("Rank  |  Distributed Unfavorable Facilities");
+            System.out.println("----------------------------------------");
+            for (int i = 0; i < numRanksForU; i++) {
+                System.out.println("  " + (i + numRanksForF) + "        " + allDistributedU[i]);
+            }
+            System.out.println("----------------------------------------");
+        }
+
+        System.out.println("Rank " + rank + " | Distributed Favorable Facilities: " + Arrays.toString(distributedF));
+        System.out.println("Rank " + rank + " | Distributed Unfavorable Facilities: " + Arrays.toString(distributedU));
+
+        // Calculate the number of facilities and offset for this rank
+        int facilities = 0;
+        int offset = 1;
+        if (rank < numRanksForF) {
+            facilities = distributedF[rank];
+            for (int i = 0; i < rank; i++) {
+                offset += distributedF[i];
+            }
+        } else {
+            facilities = distributedU[rank - numRanksForF];
+            for (int i = 0; i < numRanksForF; i++) {
+                offset += distributedF[i];
+            }
+            for (int i = 0; i < rank - numRanksForF; i++) {
+                offset += distributedU[i];
+            }
+        }
+
+        try {
+
+            String filePath = "input.txt";
+            double[][][] FacilityGrid = new double[facilities][m][n];
+            FacilityGrid = initializeArray(facilities, offset, m, n, rank, filePath);
+
+            // if (FacilityGrid != null) {
+            //     // print out the FacilityGrid array and rank
+            //     for (int i = 0; i < FacilityGrid.length; i++) {
+
+            //         System.out.println(
+            //                 "Rank " + rank + " | FacilityGrid[" + i + "]: " + Arrays.deepToString(FacilityGrid[i]));
+            //     }
+            // }
+
+            System.out.println("Running computation on Rank-" + rank);
+            // MRGASKY algorithm
+            for (int facility = 0; facility < facilities; facility++) {
+                for (int row = 0; row < m; row++) {
+                    // Step-1 Algorithm
+                    // Calculate Euclidean distance from left to right
+                    double[] dist_left_right = calculateDistanceLeftRight(FacilityGrid[facility][row]);
+
+                    // Calculate Euclidean distance from right to left
+                    double[] dist_right_left = calculateDistanceRightLeft(FacilityGrid[facility][row]);
+
+                    // Update the grid based on the minimum distance
+                    for (int col = 0; col < n; col++) {
+                        FacilityGrid[facility][row][col] = Math.min(dist_left_right[col],
+                                dist_right_left[col]);
+                    }
+                }
+            }
+
+            // Step-2 Algorithm
+            for (int facility = 0; facility < facilities; facility++) {
+                for (int column = 0; column < n; column++) {
+                    // Get ordered row values for this rank
+                    List<Map.Entry<Integer, Double>> orderedMap = getOrderedRowValues(column, m, n,
+                            FacilityGrid[facility],
+                            rank);
+
+                    int gridSize = orderedMap.size();
+
+                    // Create a list to store Vector2f objects
+                    List<Vector2f> cartesianProjections = new ArrayList<>();
+
+                    // Iterate over orderedMap and create Vector2f objects
+                    for (Map.Entry<Integer, Double> value : orderedMap) {
+                        int key = value.getKey();
+                        double val = value.getValue();
+
+                        Vector2f vector = new Vector2f(key, val);
+                        cartesianProjections.add(vector);
+                    }
+
+                    // Create a new list to store filtered Vector2f objects
+                    List<Vector2f> filteredCartesianProjections = new ArrayList<>();
+
+                    // Iterate over cartesianProjections and filter
+                    for (Vector2f vector : cartesianProjections) {
+                        if (vector.getYy() != Double.MAX_VALUE) {
+                            filteredCartesianProjections.add(vector);
+                        }
+                    }
+
+                    // Replace the original list with the filtered one
+                    cartesianProjections = filteredCartesianProjections;
+
+                    // Calculate skyline objects for this rank
+                    SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections, gridSize);
+
+                    for (int i = 0; i < objects.getDistances().size(); i++) {
+                        FacilityGrid[facility][i][column] = objects.getDistances().get(i);
+                    }
+                }
+            }
+
+            MPI.COMM_WORLD.Barrier();
+            // print FacilityGrid for each rank
+            // System.out.println("FacilityGrid at rank: " + rank + " and facilities: " + facilities);
+            // for (int i = 0; i < facilities; i++) {
+            //     for (int j = 0; j < m; j++) {
+            //         for (int k = 0; k < n; k++) {
+            //             System.out.print(FacilityGrid[i][j][k] + " ");
+            //         }
+            //         System.out.println();
+            //     }
+            //     System.out.println();
+            // }
+
+            // Step-3 Algorithm - Global Skyline Objects
+            Minmax[] minmaxArray = new Minmax[m * n];
+            int index = 0;
+
+            for (int i = 0; i < m; i++) {
+                for (int j = 0; j < n; j++) {
+                    Double local_min_val = Double.MAX_VALUE;
+                    Double local_max_val = Double.MIN_VALUE;
+                    Minmax minmax = new Minmax();
+                    for (int k = 0; k < facilities; k++) {
+                        local_min_val = Double.min(local_min_val, FacilityGrid[k][i][j]);
+                        local_max_val = Double.max(local_max_val, FacilityGrid[k][i][j]);
+                    }
+                    minmax.i = i;
+                    minmax.j = j;
+                    minmax.min = local_min_val;
+                    minmax.max = local_max_val;
+                    minmaxArray[index++] = minmax;
+                }
+            }
+
+            MPI.COMM_WORLD.Barrier();
+
+            // Gather the minmaxArray to rank 0
+            Minmax[] allMinmaxArray = null;
+            if (rank == 0) {
+                allMinmaxArray = new Minmax[m * n * size];
+            }
+
+            MPI.COMM_WORLD.Gather(minmaxArray, 0, m * n, MPI.OBJECT, allMinmaxArray, 0, m * n, MPI.OBJECT, 0);
+
+            // Print the result on rank 0
+            if (rank == 0) {
+                // System.out.println("Rank 0 received gathered MinmaxArray:");
+                // for (Minmax minmax : allMinmaxArray) {
+                //     System.out.println(
+                //             "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
+                // }
+
+                // Step-4 Algorithm - Global Skyline Objects
+                // print allMinmaxArray count
+                // System.out.println("allMinmaxArray count: " + allMinmaxArray.length);
+
+                long favRankCount = java.util.Arrays.stream(distributedF).filter(value -> value != 0).count();
+                long unfavRankCount = java.util.Arrays.stream(distributedU).filter(value -> value != 0).count();
+
+                // create favminmaxArray and unfavminmaxArray to store favorable and unfavorable
+                // facilities
+                // favminmaxarray will store the favorable facilities from allminmaxarray based
+                // on allDistributedF array
+                // unfavminmaxarray will store the unfavorable facilities from allminmaxarray
+                // based on allDistributedU array
+                Minmax[][] minmaxFavArray = new Minmax[(int) favRankCount][m * n];
+                Minmax[][] minmaxUnFavArray = new Minmax[(int) unfavRankCount][m * n];
+
+                // create favminmaxArray and unfavminmaxArray index to store favorable and
+                // unfavorable facilities
+                int favminmaxArrayIndex = 0;
+                int unfavminmaxArrayIndex = 0;
+
+                // Iterate over allMinmaxArray and store favorable and unfavorable facilities
+                for (int i = 0; i < allMinmaxArray.length; i++) {
+                    if (i < (favRankCount * m * n)) {
+                        minmaxFavArray[favminmaxArrayIndex / (m * n)][favminmaxArrayIndex
+                                % (m * n)] = allMinmaxArray[i];
+                        favminmaxArrayIndex++;
+                    } else if (i >= (favRankCount * m * n) && i < (favRankCount * m * n) + (unfavRankCount * m * n)) {
+                        minmaxUnFavArray[unfavminmaxArrayIndex / (m * n)][unfavminmaxArrayIndex
+                                % (m * n)] = allMinmaxArray[i];
+                        unfavminmaxArrayIndex++;
+                    }
+                }
+
+                // Print favminmaxArray and unfavminmaxArray
+                // System.out.println("favminmaxArray count: " + minmaxFavArray.length);
+                // for (Minmax[] minmaxRow : minmaxFavArray) {
+                //     for (Minmax minmax : minmaxRow) {
+                //         System.out.println(
+                //                 "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
+                //     }
+                // }
+
+                // System.out.println("unfavminmaxArray count: " + minmaxUnFavArray.length);
+                // for (Minmax[] minmaxRow : minmaxUnFavArray) {
+                //     for (Minmax minmax : minmaxRow) {
+                //         System.out.println(
+                //                 "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
+                //     }
+                // }
+
+                List<Minmax> globalFavFlattened = new ArrayList<>();
+                List<Minmax> globalUnFavFlattened = new ArrayList<>();
+
+                for (int j = 0; j < m * n; j++) {
+                    double globalMaxIndexFav = Double.MIN_VALUE;
+                    double globalMinimaIndexFav = Double.MAX_VALUE;
+                    int row = 0;
+                    int column = 0;
+                    // if (favRankCount == 1) {
+                    // globalMaxIndexFav = minmaxFavArray[0][j].min;
+                    // globalMinimaIndexFav = minmaxFavArray[0][j].max;
+                    // row = minmaxFavArray[0][j].i;
+                    // column = minmaxFavArray[0][j].j;
+                    // } else {
+                    for (int favFacilityCount = 0; favFacilityCount < minmaxFavArray.length; favFacilityCount++) {
+
+                        // if(j==0)
+                        // {
+                        // System.out.println("favFacilityCount: " + favFacilityCount);
+                        // System.out.println("globalMaxIndexFav: " + globalMaxIndexFav);
+                        // System.out.println("minmaxFavArray[favFacilityCount][j].max: " +
+                        // minmaxFavArray[favFacilityCount][j].max);
+                        // System.out.println("globalMinimaIndexFav: " + globalMinimaIndexFav);
+                        // System.out.println("minmaxFavArray[favFacilityCount][j].min: " +
+                        // minmaxFavArray[favFacilityCount][j].min);
+                        // }
+
+                        globalMaxIndexFav = Double.min(globalMaxIndexFav, minmaxFavArray[favFacilityCount][j].max);
+                        globalMinimaIndexFav = Double.min(globalMinimaIndexFav,
+                                minmaxFavArray[favFacilityCount][j].min);
+                        row = minmaxFavArray[favFacilityCount][j].i;
+                        column = minmaxFavArray[favFacilityCount][j].j;
+                    }
+                    // System.out.println("index: " + j);
+                    // System.out.println("globalMinimaIndexFav: " + globalMinimaIndexFav);
+                    // System.out.println("globalMaxIndexFav: " + globalMaxIndexFav);
+                    // }
+                    // Is this correct?
+                    globalFavFlattened.add(
+                            new Minmax(globalMinimaIndexFav, globalMaxIndexFav, row, column));
+
+                }
+
+                for (int j = 0; j < m * n; j++) {
+                    double globalMaxIndexUnFav = Double.MIN_VALUE;
+                    double globalMinimaIndexUnFav = Double.MAX_VALUE;
+                    int row = 0;
+                    int column = 0;
+
+                    if (unfavRankCount == 1) {
+                        globalMaxIndexUnFav = minmaxUnFavArray[0][j].min;
+                        globalMinimaIndexUnFav = minmaxUnFavArray[0][j].max;
+                        row = minmaxFavArray[0][j].i;
+                        column = minmaxFavArray[0][j].j;
+                    } else {
+
+                        for (int unfavFacilityCount = 0; unfavFacilityCount < minmaxUnFavArray.length; unfavFacilityCount++) {
+                            globalMaxIndexUnFav = Double.min(globalMaxIndexUnFav,
+                                    minmaxUnFavArray[unfavFacilityCount][j].max);
+                            globalMinimaIndexUnFav = Double.max(globalMinimaIndexUnFav,
+                                    minmaxUnFavArray[unfavFacilityCount][j].min);
+                            row = minmaxFavArray[unfavFacilityCount][j].i;
+                            column = minmaxFavArray[unfavFacilityCount][j].j;
+                        }
+                    }
+                    globalUnFavFlattened.add(
+                            new Minmax(globalMaxIndexUnFav, globalMinimaIndexUnFav, row, column));
+                }
+
+                assert globalFavFlattened.size() == globalUnFavFlattened.size();
+
+                // print globalFavFlattened and globalUnFavFlattened
+                // System.out.println("globalFavFlattened");
+                // for (int i = 0; i < globalFavFlattened.size(); i++) {
+
+                //     System.out.println(globalFavFlattened.get(i).min + " " + globalFavFlattened.get(i).max + " "
+                //             + globalFavFlattened.get(i).i + " " + globalFavFlattened.get(i).j);
+                // }
+                // System.out.println("globalUnFavFlattened");
+                // for (int i = 0; i < globalUnFavFlattened.size(); i++) {
+
+                //     System.out.println(globalUnFavFlattened.get(i).min + " " + globalUnFavFlattened.get(i).max + " "
+                //             + globalUnFavFlattened.get(i).i + " " + globalUnFavFlattened.get(i).j);
+                // }
+
+                for (int i = 0; i < m * n; i++) {
+                    // use the struct for faster memory processing as compared o memory jumps
+                    // required for a 2d array case
+                    double globalMaxIndexFav = globalFavFlattened.get(i).max;
+                    double globalMinimaIndexFav = globalFavFlattened.get(i).min;
+                    int favi = globalFavFlattened.get(i).i + 1;
+                    int favj = globalFavFlattened.get(i).j + 1;
+
+                    double globalMinimaIndexUnFav = globalUnFavFlattened.get(i).min;
+                    double globalMaxIndexUnFav = globalUnFavFlattened.get(i).max;
+                    // int ui = minmaxUnFavList.get(i).i; int uf = minmaxUnFavList.get(i).j;
+                    // ui, uf will have same value as of favi
+
+                    if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
+                        if (globalMinimaIndexUnFav < globalMinimaIndexFav
+                                || globalMinimaIndexFav == globalMinimaIndexUnFav ||
+                                globalMaxIndexFav > globalMinimaIndexUnFav
+                                || globalMinimaIndexFav > globalMaxIndexUnFav) {
+
+                            continue;
+                        } else {
+                            System.out.println(favi + " " + favj);
+                        }
+                    }
+                }
+
+            }
+        } catch (
+
+                IOException e) {
+            e.printStackTrace();
+        } finally {
+            MPI.Finalize();
+        }
+    }
+
+    private static double[][][] initializeArray(int facility, int offset, int m, int n, int rank, String filePath)
+            throws IOException {
+        if (facility > 0) {
+            double[][][] facilityGrid = new double[facility][m][n];
+
+            try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
+                String line;
+                int facilityIndex;
+
+                while ((line = br.readLine()) != null) {
+                    StringTokenizer tokenizer = new StringTokenizer(line);
+
+                    // Read facility name, row, and grid values
+                    String facilityName = tokenizer.nextToken();
+                    int row = Integer.parseInt(tokenizer.nextToken()) - 1; // Adjusted for 0-based indexing
+
+                    // Assuming the grid values are in the format "00000000"
+                    String gridValues = tokenizer.nextToken();
+
+                    // Convert gridValues to a double array
+                    double[] rowValues = new double[gridValues.length()];
+                    for (int i = 0; i < gridValues.length(); i++) {
+                        rowValues[i] = Character.getNumericValue(gridValues.charAt(i));
+                    }
+
+                    // Populate the facilityGrid array
+                    if (facilityName.contains("-")) {
+                        facilityIndex = Integer.parseInt(facilityName.substring(1, 2));
+
+                    } else {
+                        facilityIndex = Integer.parseInt(facilityName.substring(1));
+                    }
+
+                    if (offset <= facilityIndex && facilityIndex < offset + facility) {
+                        for (int j = 0; j < n; j++) {
+                            facilityGrid[facilityIndex - offset][row][j] = rowValues[j];
+                        }
+                    }
+
+                }
+            }
+
+            return facilityGrid;
+
+        } else {
+            return null;
+        }
+    }
+
+    // #region MRGASKYMPI Classes and helpers
     public static class Minmax implements Serializable {
         double min;
         double max;
         int i;
         int j;
-        Minmax(double min, double max, int i, int j){this.min = min; this.max = max; this.i = i; this.j = j;}
+
+        Minmax() {
+        };
+
+        Minmax(double min, double max, int i, int j) {
+            this.min = min;
+            this.max = max;
+            this.i = i;
+            this.j = j;
+        }
     }
 
     public static class Vector2f {
@@ -310,348 +764,6 @@ class MRGASKYMPI {
         return orderedMap;
     }
 
-    public static void main(String[] args) throws MPIException {
-        MPI.Init(args);
-        int rank = MPI.COMM_WORLD.Rank();
-        int size = MPI.COMM_WORLD.Size();
-
-        if (rank == 0 && args.length != 3) {
-            System.err.println("Usage: java MRGASKYMPI <numberOfFacilities> size size favourable unfavourable");
-            MPI.Finalize();
-            System.exit(1);
-        }
-
-        int[] params = new int[5];
-        if (rank == 0) {
-            params[0] = Integer.parseInt(args[0]);
-            params[1] = Integer.parseInt(args[1]);
-            params[2] = Integer.parseInt(args[2]);
-            params[3] = Integer.parseInt("2");
-            params[4] = Integer.parseInt("1");
-        }
-
-        MPI.COMM_WORLD.Bcast(params, 0, 5, MPI.INT, 0);
-
-        int numberOfFacilities = params[0];
-        int m = params[1];
-        int n = params[2];
-        int fav = params[3];
-        int unfav = params[4];
-
-        System.out.println("rank:" + rank + " , numberOfFacilities:" +
-                numberOfFacilities);
-        System.out.println("rank:" + rank + " , m:" + m);
-        System.out.println("rank:" + rank + " , n:" + n);
-        System.out.println("rank:" + rank + " , size:" + size);
-        System.out.println("rank:" + rank + " , favroiurable:" + fav);
-        System.out.println("rank:" + rank + " , unfavroiurable:" + unfav);
-
-        int facilitiesPerRank = numberOfFacilities / size;
-        int startIndex = rank * facilitiesPerRank;
-        int endindex = startIndex + facilitiesPerRank;
-        int remainder = m % size;
-        long startTime = System.currentTimeMillis();
-
-        double[][][] FacilityGrid = new double[facilitiesPerRank][m][n];
-
-        try {
-            String filePath = "input.txt";
-            FacilityGrid = initializeArray(facilitiesPerRank, m, n, rank, filePath);
-
-            System.out.println("Running computation on Rank-" + rank);
-            // MRGASKY algorithm
-            for (int facility = 0; facility < facilitiesPerRank; facility++) {
-                for (int row = 0; row < m; row++) {
-                    // Step-1 Algorithm
-                    // Calculate Euclidean distance from left to right
-                    double[] dist_left_right = calculateDistanceLeftRight(FacilityGrid[facility][row]);
-
-                    // Calculate Euclidean distance from right to left
-                    double[] dist_right_left = calculateDistanceRightLeft(FacilityGrid[facility][row]);
-
-                    // Update the grid based on the minimum distance
-                    for (int col = 0; col < n; col++) {
-                        FacilityGrid[facility][row][col] = Math.min(dist_left_right[col],
-                                dist_right_left[col]);
-                    }
-                }
-            }
-
-            // Step-2 Algorithm
-            for (int facility = 0; facility < facilitiesPerRank; facility++) {
-                for (int column = 0; column < n; column++) {
-                    // Get ordered row values for this rank
-                    List<Map.Entry<Integer, Double>> orderedMap = getOrderedRowValues(column, m, n,
-                            FacilityGrid[facility],
-                            rank);
-
-                    int gridSize = orderedMap.size();
-
-                    // Create a list to store Vector2f objects
-                    List<Vector2f> cartesianProjections = new ArrayList<>();
-
-                    // Iterate over orderedMap and create Vector2f objects
-                    for (Map.Entry<Integer, Double> value : orderedMap) {
-                        int key = value.getKey();
-                        double val = value.getValue();
-
-                        Vector2f vector = new Vector2f(key, val);
-                        cartesianProjections.add(vector);
-                    }
-
-                    // Create a new list to store filtered Vector2f objects
-                    List<Vector2f> filteredCartesianProjections = new ArrayList<>();
-
-                    // Iterate over cartesianProjections and filter
-                    for (Vector2f vector : cartesianProjections) {
-                        if (vector.getYy() != Double.MAX_VALUE) {
-                            filteredCartesianProjections.add(vector);
-                        }
-                    }
-
-                    // Replace the original list with the filtered one
-                    cartesianProjections = filteredCartesianProjections;
-
-                    // Calculate skyline objects for this rank
-                    SkylineObjects objects = mrGaskyAlgorithm(cartesianProjections, gridSize);
-
-                    for (int i = 0; i < objects.getDistances().size(); i++) {
-                        FacilityGrid[facility][i][column] = objects.getDistances().get(i);
-                    }
-                }
-            }
-
-            // print fav and unfav grids
-            for (int facility = 0; facility < facilitiesPerRank; facility++) {
-                System.out.println("Facility Grid:" + facility + " at Rank:" + rank + ":");
-                for (int row = 0; row < m; row++) {
-                    for (int column = 0; column < n; column++) {
-                        System.out.print(FacilityGrid[facility][row][column] + " ");
-                    }
-                    System.out.println();
-                }
-                System.out.println();
-            }
-
-            // Step-3 Algorithm - Global Skyline Objects
-            Minmax[] minmaxArray = new Minmax[m * n];
-            int index = 0;
-
-            for (int i = 0; i < m; i++) {
-                for (int j = 0; j < n; j++) {
-                    Double local_min_val = Double.MAX_VALUE;
-                    Double local_max_val = Double.MIN_VALUE;
-                    Minmax minmax = new Minmax();
-                    for (int k = 0; k < facilitiesPerRank; k++) {
-                        local_min_val = Double.min(local_min_val, FacilityGrid[k][i][j]);
-                        local_max_val = Double.max(local_max_val, FacilityGrid[k][i][j]);
-                    }
-                    minmax.i = i;
-                    minmax.j = j;
-                    minmax.min = local_min_val;
-                    minmax.max = local_max_val;
-                    minmaxArray[index++] = minmax;
-                }
-            }
-
-            // add barrier
-            MPI.COMM_WORLD.Barrier();
-
-            // print minmaxArray
-            for (Minmax minmax : minmaxArray) {
-                System.out.println("Rank:" + rank + " Min:" + minmax.min + " Max:" + minmax.max + " i:" + minmax.i
-                        + " j:" + minmax.j);
-            }
-
-            if (rank == 0) {
-                Minmax[][] minmaxFavArray = new Minmax[size - 1][m * n];
-                Minmax[][] minmaxUnFavArray = new Minmax[1][m * n];
-
-                minmaxFavArray[0] = minmaxArray;
-                // Rank 0 receives data from other ranks
-                for (int sourceRank = 1; sourceRank < size - 1; sourceRank++) {
-                    Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, sourceRank, 0);
-
-                    // Process the received data or store it as needed
-                    System.out.println("Received from Rank " + sourceRank + ": " + Arrays.toString(minmaxArray));
-                    minmaxFavArray[sourceRank] = minmaxArray;
-                }
-
-                // print out size of minmaxFavArrayx
-                System.out.println("minmaxFavArray[0] size: " + minmaxFavArray[0].length);
-                System.out.println("minmaxFavArray[1] size: " + minmaxFavArray[1].length);
-
-                // print out the minmaxFavArray
-                for (int i = 0; i < minmaxFavArray.length; i++) {
-                    for (int j = 0; j < m * n; j++) {
-                        System.out.println("minmaxFavArray[" + i + "]: " + minmaxFavArray[i][j].min + " " + minmaxFavArray[i][j].max
-                                + " " + minmaxFavArray[i][j].i + " " + minmaxFavArray[i][j].j);
-                    }
-                }
-
-                // Get Unfavourable Array from last index
-                Status status = MPI.COMM_WORLD.Recv(minmaxArray, 0, 1, MPI.OBJECT, size - 1, 0);
-                minmaxUnFavArray[0] = minmaxArray;
-
-                System.out.println("minmaxUnFavArray size: " + minmaxFavArray.length);
-
-                // print out the minmaxUnFavArray
-                for (int i = 0; i < minmaxUnFavArray.length; i++) {
-                    for (int j = 0; j < m * n; j++) {
-                        System.out.println("minmaxUnFavArray[" + i + "]: " + minmaxUnFavArray[i][j].min + " " + minmaxUnFavArray[i][j].max
-                                + " " + minmaxUnFavArray[i][j].i + " " + minmaxUnFavArray[i][j].j);
-                    }
-
-
-                    // minmaxFav size is (size - 1) * (m * n) not (m * n)
-                    // each index represents flatten index i , j
-                    List<Minmax> globalFavFlattened = new ArrayList<>();
-                    List<Minmax> globalUnFavFlattened = new ArrayList<>();
-
-                    for (int j = 0; j < m * n; j++) {
-                        double globalMaxIndexFav = Double.MIN_VALUE;
-                        double globalMinimaIndexFav = Double.MAX_VALUE;
-                        int row = 0; int column = 0;
-                        for (int favFacilityCount = 0; favFacilityCount < minmaxFavArray.length; favFacilityCount++) {
-                            globalMaxIndexFav = Double.min(globalMaxIndexFav, minmaxFavArray[j][favFacilityCount].max);
-                            globalMinimaIndexFav = Double.min(globalMinimaIndexFav, minmaxFavArray[j][favFacilityCount].min);
-                            row = minmaxFavArray[j][favFacilityCount].i;
-                            column = minmaxFavArray[j][favFacilityCount].j;
-                        }
-                        globalFavFlattened.add(
-                                new Minmax(globalMinimaIndexFav, globalMaxIndexFav, row, column)
-                        );
-                    }
-
-                    for (int j = 0; j < m * n; j++){
-                        double globalMaxIndexUnFav = Double.MIN_VALUE;
-                        double globalMinimaIndexUnFav = Double.MAX_VALUE;
-                        int row = 0; int column = 0;
-                        for (int unfavFacilityCount=0; unfavFacilityCount < minmaxUnFavArray.length; unfavFacilityCount++){
-                            globalMaxIndexUnFav = Double.min(globalMaxIndexUnFav, minmaxUnFavArray[j][unfavFacilityCount].max);
-                            globalMinimaIndexUnFav = Double.max(globalMinimaIndexUnFav, minmaxUnFavArray[j][unfavFacilityCount].min);
-                            row = minmaxFavArray[j][unfavFacilityCount].i;
-                            column = minmaxFavArray[j][unfavFacilityCount].j;
-                        }
-                        globalUnFavFlattened.add(
-                                new Minmax(globalMaxIndexUnFav, globalMinimaIndexUnFav, row, column)
-                        );
-                    }
-
-                    assert globalFavFlattened.size() == globalUnFavFlattened.size();
-
-                    // done globally reducing and flattening and reducing at the rank 0 for process.
-                    // O (N)
-                    for (int i=0 ; i < m * n ; i++){
-                        // use the struct for faster memory processing as compared o memory jumps required for a 2d array case
-                        double globalMaxIndexFav = globalFavFlattened.get(i).max;
-                        double globalMinimaIndexFav = globalFavFlattened.get(i).min;
-                        int favi = globalFavFlattened.get(i).i + 1; int favj = globalFavFlattened.get(i).j + 1;
-
-                        double globalMinimaIndexUnFav = globalUnFavFlattened.get(i).min;
-                        double globalMaxIndexUnFav = globalUnFavFlattened.get(i).max;
-//                int ui = minmaxUnFavList.get(i).i; int uf = minmaxUnFavList.get(i).j;
-                        // ui, uf will have same value as of favi
-
-                        if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
-                            if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
-                                    globalMinimaIndexFav == globalMinimaIndexUnFav ||
-                                    globalMaxIndexFav > globalMinimaIndexUnFav ||
-                                    globalMinimaIndexFav > globalMaxIndexUnFav) {
-                                continue;
-                            } else {
-                                System.out.println(favi + " " + favj);
-                            }
-                        }
-                    }
-
-
-                }
-            } else {
-                System.out.println("sending from Rank " + rank + ": " + Arrays.toString(minmaxArray));
-                MPI.COMM_WORLD.Send(minmaxArray, 0, 1, MPI.OBJECT, 0, 0);
-            }
-
-            long endTime = System.currentTimeMillis();
-            long elapsedTime = endTime - startTime;
-
-            if (rank == 0)
-                System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
-
-        } catch (IOException e) {
-            e.printStackTrace();
-        } finally {
-            MPI.Finalize();
-        }
-    }
-
-    private static double[][][] initializeArray(int numberOfFacilities, int m, int n) throws MPIException {
-        double[][][] facilityGrid = new double[numberOfFacilities][m][n];
-        java.util.Random rand = new java.util.Random(System.currentTimeMillis());
-
-        for (int facility = 0; facility < numberOfFacilities; facility++) {
-            for (int i = 0; i < m; i++) {
-                for (int j = 0; j < n; j++) {
-
-                    facilityGrid[facility][i][j] = 0;
-
-                    if (rand.nextDouble() < 0.1) {
-                        facilityGrid[facility][i][j] = 1;
-                    }
-                }
-            }
-        }
-        return facilityGrid;
-    }
-
-    private static double[][][] initializeArray(int facilitiesPerRank, int m, int n, int r, String filePath)
-            throws IOException {
-        double[][][] facilityGrid = new double[facilitiesPerRank][m][n];
-
-        try (BufferedReader br = new BufferedReader(new FileReader(filePath))) {
-            String line;
-            int facilityIndex;
-
-            while ((line = br.readLine()) != null) {
-                StringTokenizer tokenizer = new StringTokenizer(line);
-
-                // Read facility name, row, and grid values
-                String facilityName = tokenizer.nextToken();
-                int row = Integer.parseInt(tokenizer.nextToken()) - 1; // Adjusted for 0-based indexing
-
-                // Assuming the grid values are in the format "00000000"
-                String gridValues = tokenizer.nextToken();
-
-                // Convert gridValues to a double array
-                double[] rowValues = new double[gridValues.length()];
-                for (int i = 0; i < gridValues.length(); i++) {
-                    rowValues[i] = Character.getNumericValue(gridValues.charAt(i));
-                }
-
-                // Populate the facilityGrid array
-                if (facilityName.contains("-")) {
-                    facilityIndex = Integer.parseInt(facilityName.substring(1, 2)) - 1;
-
-                } else {
-                    facilityIndex = Integer.parseInt(facilityName.substring(1)) - 1;
-                }
-
-                // Populate the facilityGrid array
-                int belongToRank = facilityIndex / facilitiesPerRank;
-                int index = facilityIndex % facilitiesPerRank;
-
-                if (belongToRank == r) {
-
-                    for (int j = 0; j < n; j++) {
-                        facilityGrid[index][row][j] = rowValues[j];
-                    }
-                }
-            }
-        }
-
-        return facilityGrid;
-    }
-
     // Function to calculate Euclidean distance from left to right for a single row
     private static double[] calculateDistanceLeftRight(double[] row) {
         double[] dist_left_right = new double[row.length];
@@ -687,5 +799,6 @@ class MRGASKYMPI {
         }
         return dist_right_left;
     }
+    // #endregion
 
 }
