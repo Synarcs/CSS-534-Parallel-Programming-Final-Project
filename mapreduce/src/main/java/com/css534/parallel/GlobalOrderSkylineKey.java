@@ -6,6 +6,9 @@ import java.io.DataInput;
 import java.io.DataOutput;
 import java.io.IOException;
 
+/**
+ *  A custom composite key with custom compartor use ful for internal hadoop comparator to order values in keys
+ */
 public class GlobalOrderSkylineKey implements WritableComparable<GlobalOrderSkylineKey> {
     private Integer rowNumber;
     private Integer colNumber;;
@@ -18,6 +21,9 @@ public class GlobalOrderSkylineKey implements WritableComparable<GlobalOrderSkyl
     }
 
     @Override
+    /**
+     *  Use this comparator to compare the row value first and then compare the column for this key.
+     */
     public int compareTo(GlobalOrderSkylineKey o) {
         int cmp = rowNumber.compareTo(o.rowNumber);
         if (cmp == 0) {

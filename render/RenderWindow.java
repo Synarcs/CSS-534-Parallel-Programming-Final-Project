@@ -1,4 +1,3 @@
-
 import javax.swing.*;
 import java.awt.*;
 import java.awt.event.MouseAdapter;
@@ -10,6 +9,9 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ * A Custom GUI Application build using Java AWT to visualize the skyline objects in the grid.
+ */
 public class RenderWindow extends JFrame implements Runnable {
 
     private int[][] binaryGrid;

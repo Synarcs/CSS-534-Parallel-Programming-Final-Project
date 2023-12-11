@@ -1,18 +1,17 @@
 package com.css534.parallel;
 
-
 import org.apache.spark.SparkConf;
 import org.apache.spark.api.java.JavaPairRDD;
 import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import scala.Serializable;
 import scala.Tuple2;
+import scala.Int;
 
+import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
-
 
 public class Main implements Serializable {
     private final static int clusterSize = 4;
@@ -21,7 +20,261 @@ public class Main implements Serializable {
 
     public Main(){}
 
+    public static void main(String[] args) {
 
+        SparkConf conf = new SparkConf().setAppName("GaskySparkJob")
+                .set("spark.executor.cores", "4")  // Set the number of cores per executor will be overwritten in runtime
+                .set("spark.executor.instances", String.valueOf(clusterSize))  // Set the number of executor instances overwritten in runtime
+                .set("spark.executor.memory", "4g");  // Set the executor memory overwritten in runtime
+
+        System.out.println(Arrays.toString(args));
+        String fileName = args[0];
+        long startTime = System.currentTimeMillis();
+
+        try {
+            JavaSparkContext sc = new JavaSparkContext(conf);
+            sc.setLogLevel("ERROR");
+
+            int numCores = Integer.parseInt(sc.getConf().get("spark.executor.cores")) *
+                    Integer.parseInt(sc.getConf().get("spark.executor.cores"));
+            long totalMemory = Long.parseLong(sc.getConf().get("spark.executor.memory").replace("g", "")) *
+                    Integer.parseInt(sc.getConf().get("spark.executor.instances"));
+
+            numCores = numCores * clusterSize;
+
+            // read the file from hdfs later
+            JavaRDD<String> inputData = sc.textFile(fileName).repartition(numCores);
+            // hdfs://cssmpi1h.uwb.edu:28250/user/vedpar/parallel/input
+
+            System.out.println("the grid size for the skyline objects is " + Integer.parseInt(args[1]));
+
+            System.out.println("Parallel Processing of Local Skyline Started");
+
+            // read the binary grid data parse and emit the k/v pairs for the rrdd pair
+            // each pair contains information resmbling
+                            // <Facility Type, Col Number> , List<Row Number, Distances>
+            JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Double, Double>>> data = inputData
+                    .flatMapToPair(fileLine -> parseInputData(fileLine))
+                    .groupByKey();
+
+
+            System.out.println("Parallely Transformed total tuples " + data.count());
+
+            System.out.println("Ordering the Row Projections for each column");
+            // Sort all the tuples preset in the value based on the row number in col tuple (we can use shuffle paritioning  as well)
+            data = data.mapValues((Iterable<Tuple2<Double, Double>> iterable) -> {
+                List<Tuple2<Double, Double>> list = new ArrayList<>();
+                iterable.forEach(list::add);
+                list.sort(Comparator.comparing(Tuple2::_1));
+                return list;
+            });
+
+            System.out.println("Filtering out highly dominated points by others Max Distance from X Axis");
+            // Once sorted out remove all the highly dominated points by others from the grid since they can never be a skyline objects
+            data = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
+                List<Tuple2<Double, Double>> filteredValue = new ArrayList<>();
+                for (Tuple2<Double, Double> value : columnProjection) {
+                    if (value._2() != Double.MAX_VALUE) {
+                        filteredValue.add(value);
+                    }
+                }
+                return filteredValue;
+            });
+
+            if (DEBUG)
+                debug(data);
+
+            // apply the mrgasky algorithm same as map reduce and other implementation over the values
+            JavaPairRDD<Tuple2<String, Integer>, List<Double>> colProjections = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
+                return mrGaskyAlgorithm(columnProjection, Integer.parseInt(args[1])).iterator();
+            }).mapValues((Iterator<Double> iter) -> {
+                List<Double> list = new ArrayList<>();
+                while (iter.hasNext()) {
+                    list.add(iter.next());
+                }
+                return list;
+            });
+
+            if (DEBUG)
+                colProjections.collect().forEach(v -> {
+                    System.out.println(v._1._1 + " " + v._1._2 + " --> " + v._2);
+                });
+
+//            System.out.println("Running the MrGaskY Algorithm");
+            // Run the core transformation or global skyline computation across all the rdd present
+            // this is same like folding the k/v parse to generate more k/v pairs using flatmap.
+                //            <Row, Row> ,  List<Facility Category, Distance>>
+            JavaPairRDD<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> mergedGlobalReduce =
+                    colProjections.flatMapToPair((Tuple2<Tuple2<String, Integer>, List<Double>> value) -> {
+                        Tuple2<String, Integer> key = value._1();
+                        List<Double> distances = value._2();
+
+                        int colNumber = key._2();
+                        String facilityName = key._1();
+                        boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
+
+                        //col row,fac_type  distance
+                        List<Tuple2<Tuple2<Integer, Integer>, Tuple2<Integer, Double>>> listFlatten = new ArrayList<>();
+
+                        for (int row=0; row < distances.size(); row++){
+                            if (isUnfavorableFacility){
+                                listFlatten.add(
+                                        new Tuple2<>(
+                                                new Tuple2<>(colNumber, row + 1),
+                                                new Tuple2<>(0, distances.get(row))
+                                        )
+                                );
+                            }else {
+                                listFlatten.add(
+                                        new Tuple2<>(
+                                                new Tuple2<>(colNumber, row + 1),
+                                                new Tuple2<>(1, distances.get(row))
+                                        )
+                                );
+                            }
+                        }
+                        return listFlatten.iterator();
+                    }).groupByKey();
+
+            if (DEBUG){
+                mergedGlobalReduce.take(1).forEach((Tuple2<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> value) -> {
+                    System.out.println(value._1()._1() + " " + value._1()._2());
+                    for (Tuple2<Integer, Double> pres: value._2()){
+                        System.out.println(pres + "\t");
+                    }
+                });
+            }
+
+            System.out.println("Applying global Skyline Point Reduction on grid");
+            if (DEBUG)
+                mergedGlobalReduce.collect().forEach((reducedProjections) -> {
+                    log.info(reducedProjections._1() + ",,,," + reducedProjections._2());
+                });
+
+            // did not use flatmaptopair for memory efficiency and less requirement for shuffle sort on the rdd
+            // just apply map transformation to filter out the points if the points are favourable or not
+            JavaPairRDD<Tuple2<Integer, Integer>, Boolean> filterDominantGlobalPoints = mergedGlobalReduce.mapValues((Iterable<Tuple2<Integer, Double>> projectedPointPlane) -> {
+                double globalMaxIndexFav = Double.MIN_VALUE;
+                double globalMaxIndexUnFav = Double.MIN_VALUE;
+
+                double globalMinimaIndexFav = Double.MAX_VALUE;
+                double globalMinimaIndexUnFav = Double.MAX_VALUE;
+
+                int FACILITY_COUNT = 2;
+                List<Double> processGridData[] = new ArrayList[FACILITY_COUNT];
+                for (int i=0; i < processGridData.length; i++) processGridData[i] = new ArrayList<>();
+
+                final int FAVOURABLE_POSITION = 1;
+                final int UNFAVOURABLE_POSITION = 0;
+                // facility Type    min Distance suggested by projection
+                for (Tuple2<Integer, Double> combinedCoordinateprojection: projectedPointPlane){
+                    if (combinedCoordinateprojection._1() == FAVOURABLE_POSITION)
+                        processGridData[0].add(
+                                combinedCoordinateprojection._2()
+                        );
+                    else
+                        processGridData[1].add(
+                                combinedCoordinateprojection._2()
+                        );
+                }
+
+                for (Double fd: processGridData[0]){
+                    globalMinimaIndexFav = Double.min(globalMinimaIndexFav, fd);
+                    globalMaxIndexFav = Double.max(globalMaxIndexFav, fd);
+                }
+
+                for (Double ud: processGridData[1]){
+                    globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, ud);
+                    globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, ud);
+                }
+
+                if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE){
+                    if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
+                            globalMinimaIndexFav == globalMinimaIndexUnFav ||
+                            globalMaxIndexFav > globalMinimaIndexUnFav ||
+                            globalMinimaIndexFav > globalMaxIndexUnFav) {
+                        log.info("The minimum scale object with unFav facility more closer");
+                        return false;
+                    }else {
+                        return true;
+                    }
+                }
+                return false;
+            });
+
+            if (DEBUG)
+                filterDominantGlobalPoints.collect().forEach((reducedProjections) -> {
+                    log.info(reducedProjections._1() + "<--->" + reducedProjections._2());
+                });
+
+            // filter out the skyline coordinates that are not skyline objects
+            filterDominantGlobalPoints = filterDominantGlobalPoints.filter((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> value._2());
+
+
+            // some more different rdd transformation to match the output with other parallel implementations
+            /*
+                1. To map to pair transformation to flatten the tdd pair from boolean
+                2. The RDD pair is of format <Row, Column>
+                3. Group by the key (Row values)
+                4. order the colums belonging to that row projection
+                5. Apply flatten map transform to flatten the list
+                6. Finally sort based on the keys (row) to emit final k/v pars as row, column the final skyline objects.
+             */
+            JavaPairRDD<Integer, Integer> transformedCoordinates = filterDominantGlobalPoints.mapToPair((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> {
+                int colProjection = value._1()._1;
+                int rowProjection = value._1()._2;
+
+                return new Tuple2<Integer, Integer>(
+                        rowProjection,
+                        colProjection
+                );
+            });
+
+            log.info("Projecting and Ordering the final Result for the coordinate projections");
+            JavaPairRDD<Integer, Integer> orderedCoordinateProjection = transformedCoordinates.sortByKey()
+                    .groupByKey()
+                    .mapValues((orderedColumnProjection) -> {
+                        List<Integer> sortedValues = new ArrayList<>();
+                        orderedColumnProjection.forEach(sortedValues::add);
+                        Collections.sort(sortedValues);
+                        return sortedValues;
+                    })
+                    .flatMapToPair((Tuple2<Integer, List<Integer>> value) -> {
+
+                        List<Tuple2<Integer, Integer>> resultOdering = new ArrayList<>();
+                        int currentOrderedRowProjection = value._1();
+
+                        for (Integer colProjection: value._2()){
+                            resultOdering.add(
+                                    new Tuple2<>(
+                                            currentOrderedRowProjection,
+                                            colProjection
+                                    )
+                            );
+                        }
+                        return resultOdering.iterator();
+                    }).sortByKey();
+
+
+            // efficiently re shuffle and the output is dumped that are the skyline objects.
+
+            orderedCoordinateProjection.coalesce(1).saveAsTextFile("output");
+            if (DEBUG){
+                 orderedCoordinateProjection.collect().forEach((reducedProjections) -> {
+                     // projecting the final orderProjection of coordinates
+                     System.out.println(
+                             reducedProjections._1() + "  " + reducedProjections._2()
+                     );
+                 });
+            }
+            System.out.println("Elasped Time: " + (System.currentTimeMillis() - startTime));
+        }catch (Exception exception){
+            System.out.println("error in processing the spark context");
+            exception.printStackTrace();
+        }
+    }
+
+    //region GASKY algorithm, helpers and claases used in it.
     private static Tuple2<Double, Double> calcBisectorProjections(double x, double y , double x1, double y1){
         double xx = ((y1 * y1 ) - (y * y) + (x1 * x1) - (x * x)) / 2 * (x1 - x);
         double yy = 0;
@@ -42,7 +295,7 @@ public class Main implements Serializable {
                     )
             );
         }
-        // i can do it in O(1) space, lazy to do it lol
+
         // implementation of combine intervals using a the interval frame
         List<double[] > mergedInterval = new ArrayList<>(intervals.size());
         mergedInterval.add(
@@ -259,8 +512,6 @@ public class Main implements Serializable {
         return result.iterator();
     }
 
-
-
     private static void debug(JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Double, Double>>> rdd){
         rdd.collect().forEach(tuple -> {
             Tuple2<String, Integer> key = tuple._1();
@@ -280,239 +531,5 @@ public class Main implements Serializable {
             throw new RuntimeException();
 
         return input[input.length - 1].length();
-    }
-    public static void main(String[] args) {
-
-        SparkConf conf = new SparkConf().setAppName("GaskySparkJob")
-                .set("spark.executor.cores", "4")  // Set the number of cores per executor
-                .set("spark.executor.instances", String.valueOf(clusterSize))  // Set the number of executor instances
-                .set("spark.executor.memory", "4g");  // Set the executor memory
-
-        System.out.println(Arrays.toString(args));
-        String fileName = args[0];
-        long startTime = System.currentTimeMillis();
-
-        try {
-            JavaSparkContext sc = new JavaSparkContext(conf);
-            sc.setLogLevel("ERROR");
-
-            int numCores = Integer.parseInt(sc.getConf().get("spark.executor.cores")) *
-                    Integer.parseInt(sc.getConf().get("spark.executor.cores"));
-            long totalMemory = Long.parseLong(sc.getConf().get("spark.executor.memory").replace("g", "")) *
-                    Integer.parseInt(sc.getConf().get("spark.executor.instances"));
-
-            numCores = numCores * clusterSize;
-
-            // read the file from hdfs later
-            JavaRDD<String> inputData = sc.textFile(fileName).repartition(numCores);
-            // hdfs://cssmpi1h.uwb.edu:28250/user/vedpar/parallel/input
-
-
-            System.out.println("the grid size for the skyline objects is " + Integer.parseInt(args[1]));
-
-            System.out.println("Parallel Processing of Local Skyline Started");
-            JavaPairRDD<Tuple2<String, Integer>, Iterable<Tuple2<Double, Double>>> data = inputData
-                    .flatMapToPair(fileLine -> parseInputData(fileLine))
-                    .groupByKey();
-
-
-            System.out.println("Parallely Transformed total tuples " + data.count());
-
-            System.out.println("Ordering the Row Projections for each column");
-            data = data.mapValues((Iterable<Tuple2<Double, Double>> iterable) -> {
-                List<Tuple2<Double, Double>> list = new ArrayList<>();
-                iterable.forEach(list::add);
-                list.sort(Comparator.comparing(Tuple2::_1));
-                return list;
-            });
-
-            System.out.println("Filtering out highly dominated points by others Max Distance from X Axis");
-            data = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
-                List<Tuple2<Double, Double>> filteredValue = new ArrayList<>();
-                for (Tuple2<Double, Double> value : columnProjection) {
-                    if (value._2() != Double.MAX_VALUE) {
-                        filteredValue.add(value);
-                    }
-                }
-                return filteredValue;
-            });
-
-            if (DEBUG)
-                debug(data);
-
-            JavaPairRDD<Tuple2<String, Integer>, List<Double>> colProjections = data.mapValues((Iterable<Tuple2<Double, Double>> columnProjection) -> {
-                return mrGaskyAlgorithm(columnProjection, Integer.parseInt(args[1])).iterator();
-            }).mapValues((Iterator<Double> iter) -> {
-                List<Double> list = new ArrayList<>();
-                while (iter.hasNext()) {
-                    list.add(iter.next());
-                }
-                return list;
-            });
-
-            if (DEBUG)
-                colProjections.collect().forEach(v -> {
-                    System.out.println(v._1._1 + " " + v._1._2 + " --> " + v._2);
-                });
-
-
-            System.out.println("Running the MrGaskY Algorithm");
-            JavaPairRDD<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> mergedGlobalReduce =
-                    colProjections.flatMapToPair((Tuple2<Tuple2<String, Integer>, List<Double>> value) -> {
-                        Tuple2<String, Integer> key = value._1();
-                        List<Double> distances = value._2();
-
-                        int colNumber = key._2();
-                        String facilityName = key._1();
-                        boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
-
-                        // col row ,                    fac type    distance
-                        List<Tuple2<Tuple2<Integer, Integer>, Tuple2<Integer, Double>>> listFlatten = new ArrayList<>();
-
-                        for (int row=0; row < distances.size(); row++){
-                            if (isUnfavorableFacility){
-                                listFlatten.add(
-                                        new Tuple2<>(
-                                                new Tuple2<>(colNumber, row + 1),
-                                                new Tuple2<>(0, distances.get(row))
-                                        )
-                                );
-                            }else {
-                                listFlatten.add(
-                                        new Tuple2<>(
-                                                new Tuple2<>(colNumber, row + 1),
-                                                new Tuple2<>(1, distances.get(row))
-                                        )
-                                );
-                            }
-                        }
-                        return listFlatten.iterator();
-                    }).groupByKey();
-            // .sortByKey(Comparator.comparing(Tuple2::_2), true, numCores);
-
-            if (DEBUG){
-                mergedGlobalReduce.take(1).forEach((Tuple2<Tuple2<Integer, Integer>, Iterable<Tuple2<Integer, Double>>> value) -> {
-                    System.out.println(value._1()._1() + " " + value._1()._2());
-                    for (Tuple2<Integer, Double> pres: value._2()){
-                        System.out.println(pres + "\t");
-                    }
-                });
-            }
-
-
-            System.out.println("Applying global Skyline Point Reduction on grid");
-            if (DEBUG)
-                mergedGlobalReduce.collect().forEach((reducedProjections) -> {
-                    log.info(reducedProjections._1() + ",,,," + reducedProjections._2());
-                });
-
-            // did not use flatmapto pair for memory efficienty and less requirement for shuffle sort on the rdd
-            JavaPairRDD<Tuple2<Integer, Integer>, Boolean> filterDominantGlobalPoints = mergedGlobalReduce.mapValues((Iterable<Tuple2<Integer, Double>> projectedPointPlane) -> {
-                double globalMaxIndexFav = Double.MIN_VALUE;
-                double globalMaxIndexUnFav = Double.MIN_VALUE;
-
-                double globalMinimaIndexFav = Double.MAX_VALUE;
-                double globalMinimaIndexUnFav = Double.MAX_VALUE;
-
-                int FACILITY_COUNT = 2;
-                List<Double> processGridData[] = new ArrayList[FACILITY_COUNT];
-                for (int i=0; i < processGridData.length; i++) processGridData[i] = new ArrayList<>();
-
-                final int FAVOURABLE_POSITION = 1;
-                final int UNFAVOURABLE_POSITION = 0;
-                // facility Type    min Distance suggested by projection
-                for (Tuple2<Integer, Double> combinedCoordinateprojection: projectedPointPlane){
-                    if (combinedCoordinateprojection._1() == FAVOURABLE_POSITION)
-                        processGridData[0].add(
-                                combinedCoordinateprojection._2()
-                        );
-                    else
-                        processGridData[1].add(
-                                combinedCoordinateprojection._2()
-                        );
-                }
-
-                for (Double fd: processGridData[0]){
-                    globalMinimaIndexFav = Double.min(globalMinimaIndexFav, fd);
-                    globalMaxIndexFav = Double.min(globalMaxIndexFav, fd);
-                }
-
-                for (Double ud: processGridData[1]){
-                    globalMinimaIndexUnFav = Double.min(globalMinimaIndexUnFav, ud);
-                    globalMaxIndexUnFav = Double.max(globalMaxIndexUnFav, ud);
-                }
-
-                if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE){
-                    if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
-                            globalMinimaIndexFav == globalMinimaIndexUnFav ||
-                            globalMaxIndexFav > globalMinimaIndexUnFav ||
-                            globalMinimaIndexFav > globalMaxIndexUnFav) {
-                        log.info("The minimum scale object with unFav facility more closer");
-                        return false;
-                    }else {
-                        return true;
-                    }
-                }
-                return false;
-            });
-
-            if (DEBUG)
-                filterDominantGlobalPoints.collect().forEach((reducedProjections) -> {
-                    log.info(reducedProjections._1() + "<--->" + reducedProjections._2());
-                });
-
-
-            filterDominantGlobalPoints = filterDominantGlobalPoints.filter((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> value._2());
-
-            JavaPairRDD<Integer, Integer> transformedCoordinates = filterDominantGlobalPoints.mapToPair((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> {
-                int colProjection = value._1()._1;
-                int rowProjection = value._1()._2;
-
-                return new Tuple2<Integer, Integer>(
-                        rowProjection,
-                        colProjection
-                );
-            });
-
-            log.info("Projecting and Ordering the final Result for the coordinate projections");
-            JavaPairRDD<Integer, Integer> orderedCoordinateProjection = transformedCoordinates.sortByKey()
-                    .groupByKey()
-                    .mapValues((orderedColumnProjection) -> {
-                        List<Integer> sortedValues = new ArrayList<>();
-                        orderedColumnProjection.forEach(sortedValues::add);
-                        Collections.sort(sortedValues);
-                        return sortedValues;
-                    })
-                    .flatMapToPair((Tuple2<Integer, List<Integer>> value) -> {
-
-                        List<Tuple2<Integer, Integer>> resultOdering = new ArrayList<>();
-                        int currentOrderedRowProjection = value._1();
-
-                        for (Integer colProjection: value._2()){
-                            resultOdering.add(
-                                    new Tuple2<>(
-                                            currentOrderedRowProjection,
-                                            colProjection
-                                    )
-                            );
-                        }
-                        return resultOdering.iterator();
-                    }).sortByKey();
-
-
-            orderedCoordinateProjection.coalesce(1).saveAsTextFile("output");
-            if (DEBUG){
-                 orderedCoordinateProjection.collect().forEach((reducedProjections) -> {
-                     // projecting the final orderProjection of coordinates
-                     System.out.println(
-                             reducedProjections._1() + "  " + reducedProjections._2()
-                     );
-                 });
-            }
-            System.out.println("Elasped Time: " + (System.currentTimeMillis() - startTime));
-        }catch (Exception exception){
-            System.out.println("error in processing the spark context");
-            exception.printStackTrace();
-        }
     }
 }

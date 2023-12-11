@@ -1,11 +1,13 @@
 package com.css534.parallel;
 
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 
 
 @SuppressWarnings("unused")
+/**
+ * This algorithm implementation is same as done and mentioned in map reduce case and remove consistent across all other parallel implementations
+ */
 public class MinMaxDistance {
 
     private final int FACILITY_CATEGROY = 2;
@@ -36,7 +38,7 @@ public class MinMaxDistance {
 
         for (Double fd: processGridData[0]){
             globalMinimaIndexFav = Double.min(globalMinimaIndexFav, fd);
-            globalMaxIndexFav = Double.min(globalMaxIndexFav, fd);
+            globalMaxIndexFav = Double.max(globalMaxIndexFav, fd);
         }
 
         for (Double ud: processGridData[1]){

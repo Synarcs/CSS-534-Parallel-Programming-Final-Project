@@ -4,6 +4,7 @@ import org.apache.hadoop.mapreduce.Partitioner;
 
 /**
  *  A Custom paritioner written for debug purpose to debug the custom paritioning implementation
+ *   Used to send all the K / v pairs having same column to the same reducer.
  */
 @SuppressWarnings("unused")
 public class GlobalOrderSkylinePartioner extends Partitioner<GlobalOrderSkylineKey, Object> {

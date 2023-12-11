@@ -15,6 +15,9 @@ import java.util.stream.Collectors;
 
 import static com.css534.parallel.DelimeterRegexConsts.*;
 
+/**
+ * Core class to run the dominance coordinates finding algorithm using voronoi plygons and their proximity intervals
+ */
 public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapValue, Text, Text> {
 
     private final String maxRangeValue = "1.7976931348623157E308";
@@ -30,6 +33,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         this.conf = job;
     }
 
+    // use the bisector x value projection to determine the projection between 2 points in coordinate axis
     private Vector2FProjections calcBisectorProjections(double x, double y , double x1, double y1){
         Vector2FProjections vector2F = new Vector2FProjections();
         double xx = ((y1 * y1 ) - (y * y) + (x1 * x1) - (x * x)) / 2 * (x1 - x);
@@ -38,6 +42,7 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         return vector2F;
     }
 
+    // runs the core algorithm to calculate the proximity points for the remaining un dominated
     private List<double[]> findProximityPoints(List<Vector2f> unDominatedPoints) {
         List<Vector2f> intervals = new ArrayList<>();
         for (int i=1; i < unDominatedPoints.size(); i++){
@@ -46,11 +51,10 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
             intervals.add(
                     new Vector2f(
                             (point1.getXx() + point2.getXx()) / 2,
-                            0 // point lying on with intersection on X axis
+                            0 // point lying on with intersection on X axis basically same as considering x value projection
                     )
             );
         }
-        // i can do it in O(1) space, lazy to do it lol
         // implementation of combine intervals using a the interval frame
         List<double[] > mergedInterval = new ArrayList<>(intervals.size());
         mergedInterval.add(
@@ -64,6 +68,8 @@ public class GaskyReducer extends MapReduceBase implements Reducer<MapKeys, MapV
         mergedInterval.add(
                 new double[]{intervals.get(intervals.size() - 1).getXx(), gridSize}
         );
+        // return all proximity intervals for the remaining non dominated points
+        // these intervals are projected over x asis but basically they are same as the walls or boundries of voronoi polygons.
         return mergedInterval;
     }
 

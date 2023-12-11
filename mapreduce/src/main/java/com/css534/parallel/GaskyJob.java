@@ -12,6 +12,10 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.util.Arrays;
 
+
+/**
+ * Core Job to configure the the tow main jobs to the run the mrgasky and min-max distance algorithm
+ */
 public class GaskyJob implements Serializable {
 
     private static  JobControl getJobController(){
@@ -25,6 +29,7 @@ public class GaskyJob implements Serializable {
 
         long time = System.currentTimeMillis();
 
+        // first job to run the core mapping and dominance relation finding  using vornoi polygons
         JobConf conf = new JobConf(GaskyJob.class);
 
         String favourableFacilitiesCount = args[3];
@@ -64,6 +69,7 @@ public class GaskyJob implements Serializable {
             }
         }
 
+        // second job to find the global skyline for each index in the grid.
         JobConf conf2 = new JobConf(GaskyJob.class);
         conf2.setJobName("Distributed Skyline Reduction");
         // Set configurations for Job 2 as needed

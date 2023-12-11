@@ -11,7 +11,9 @@ import java.util.*;
 import static com.css534.parallel.DelimeterRegexConsts.FACILITY_COUNT;
 import static com.css534.parallel.DelimeterRegexConsts.FAVOURABLE_POSITION;
 
-
+/**
+ *      Second Reducer class to apply the min-max algorithm to find the skyline objects
+ */
 public class FacilityCombinerReducer extends MapReduceBase implements Reducer<GlobalOrderSkylineKey, Text, Text, Text> {
     private JobConf conf;
     private Log log = LogFactory.getLog(FacilityCombinerReducer.class);
@@ -34,12 +36,17 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Gl
         int colNumber = compositeIndex.getColNumber();
         int rowNumber = compositeIndex.getRowNumber();
 
+        // List to hold the segregation of the facilities as favourable and unfaborable
         List<Double> processGridData[] = new ArrayList[FACILITY_COUNT];
 
         for (int i=0; i < processGridData.length; i++) processGridData[i] = new ArrayList<>();
 
         StringBuilder builder = new StringBuilder();
 
+        //  (1,3.0)(1,3.0)(0,1.0) (sample input received to the reducer)
+        /*
+         *   Filter out the result if 1 its favourable else its unfavorable type facility.
+         */
         while (projectionValues.hasNext()){
             String[] currentObject = projectionValues.next().toString().trim().split(",");
             if (currentObject.length != 2){
@@ -52,15 +59,20 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Gl
                 processGridData[1].add(Double.valueOf(currentObject[1]));
         }
 
+
+        /**
+         *  Implementation of Min-Max distance algorithm starts
+         */
         double globalMaxIndexFav = Double.MIN_VALUE;
         double globalMaxIndexUnFav = Double.MIN_VALUE;
 
         double globalMinimaIndexFav = Double.MAX_VALUE;
         double globalMinimaIndexUnFav = Double.MAX_VALUE;
 
+
         for (Double fd: processGridData[0]){
             globalMinimaIndexFav = Double.min(globalMinimaIndexFav, fd);
-            globalMaxIndexFav = Double.min(globalMaxIndexFav, fd);
+            globalMaxIndexFav = Double.max(globalMaxIndexFav, fd);
         }
 
         for (Double ud: processGridData[1]){
@@ -72,11 +84,14 @@ public class FacilityCombinerReducer extends MapReduceBase implements Reducer<Gl
         log.info("The size of the reduced columns for all unFav grids is " + processGridData[1].size());
 
         // // the size should match total number of facilities including fav and unfavourable
+        /*
+            Considering computational projection in the form of circles to find locus of all points
+         */
         if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE){
-            if (globalMinimaIndexUnFav < globalMinimaIndexFav ||
-                    globalMinimaIndexFav == globalMinimaIndexUnFav ||
-                        globalMaxIndexFav > globalMinimaIndexUnFav ||
-                        globalMinimaIndexFav > globalMaxIndexUnFav){
+            if (globalMinimaIndexUnFav < globalMinimaIndexFav || // locus of points for unfavourable are much closer than fav
+                    globalMinimaIndexFav == globalMinimaIndexUnFav ||   // both of the locus are equi distant
+                        globalMaxIndexFav > globalMinimaIndexUnFav ||   // max locus for all points favourable is greater than the unfav min it means unfav is much closer (the inner circle for unfav)
+                        globalMinimaIndexFav > globalMaxIndexUnFav){  // an implicit case mindistance for fav facility is greater than max for unfav
                 log.info("The minimum scale object with unFav facility more closer");
                 return;
             }

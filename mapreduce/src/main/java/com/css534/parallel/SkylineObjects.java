@@ -3,8 +3,10 @@ package com.css534.parallel;
 import java.io.Serializable;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Stack;
 
+/**
+ * A Plain Java POJO used to define the skyline objects.
+ */
 public class SkylineObjects implements Serializable {
     private List<Double> distances;
     private List<Vector2f> skylineObjects;

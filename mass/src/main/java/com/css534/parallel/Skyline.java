@@ -10,7 +10,6 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -25,17 +24,20 @@ import static com.css534.parallel.GridConstants.COMPUTE_PROXIMITY_POLYGONS;
 import static com.css534.parallel.GridConstants.COMPUTE_GLOBAL_SKYLINE;
 
 @SuppressWarnings("unused")
-public class QuickStart {
+public class Skyline {
 
     private static final String NODE_FILE = "nodes.xml";
     private static final String INPUT_FILE = "input";
 
-    public Object[] getObjectArrayArgs() {
-        return new Object[1];
-    }
-
     private static Log4J2Logger getLogger() { return MASS.getLogger(); }
 
+    /**
+     *  This runs in a synchronized way read only by one thread before doing mass.INIT
+     * @param filename
+     * @param gridSize
+     * @param facilityCount
+     * @return the read input file list<List<String>> for the given binary input matrix
+     */
     private static synchronized String[][] readBinaryInput(String filename, int gridSize, int facilityCount){
         Map<String, List<String>> orderMap = new LinkedHashMap<>();
         getLogger().debug("Reading the binary Grid Matrix");
@@ -84,11 +86,6 @@ public class QuickStart {
         int facilityCount = Integer.parseInt(args[0]); // includes both fav and unfav
 
 
-        /*
-         *  We assume the code  will receive even facilities for binary projections
-         * and have equal distribution to fav and unfav
-         */
-
         long startTime = System.currentTimeMillis();
         int gridX = Integer.parseInt(args[1]);
         int gridY = Integer.parseInt(args[2]);
@@ -111,11 +108,11 @@ public class QuickStart {
         Places spatialGrid = new Places(1, SkylineGridPlaces.class.getName(), (Object) 0, facilityCount);
 
 
-        int[] fx = new int[]{gridX , gridY};
-        spatialGrid.callAll(INIT, fx);
-        spatialGrid.callAll(INIT_BINARY_MATRIX, tokens);
-        spatialGrid.callAll(COMPUTE_BEST_ROW_DISTANCE);
-        spatialGrid.callAll(COMPUTE_PROXIMITY_POLYGONS);
+        int[] fx = new int[]{gridX , gridY};// create the argument for call to set grid dimension internal in each place
+        spatialGrid.callAll(INIT, fx); // use call all to configure all places
+        spatialGrid.callAll(INIT_BINARY_MATRIX, tokens); // parallely to fill the binary matrix for each pplace
+        spatialGrid.callAll(COMPUTE_BEST_ROW_DISTANCE);// to compute row wise distance parallely for each grid in the place
+        spatialGrid.callAll(COMPUTE_PROXIMITY_POLYGONS); // run the dominanance relation algorithm parallelly for all places.
 
         // Agents agent = new Agents(2, SkylineAgent.class.getName(), (Object) 0, spatialGrid ,  facilityCount);
 
@@ -140,14 +137,17 @@ public class QuickStart {
         // processing all the valid frame index
         for (int i=0; i <  finalFilteredDistancesIndex.length; i++){
             int loopVal = i;
-            //System.out.println("the length for this called" + arrayOfObjects.length + " " + arrayOfObjects[0].length);
-            Object[] data = spatialGrid.callAll(COMPUTE_GLOBAL_SKYLINE,
+            // calls all the places to provide the best distance at a given index
+            // the length of object array is same as the total places created
+            // we pass call all an int flattened array that is provideing call all to all places with specific index
+            // So basically to call all places to get index 1,1 location we do places.callAlL(COMPUTE_GLOBAL_SKYLINE, [[1,1],[1,1]...]n (place count).
+            Object[] data = spatialGrid.callAll(COMPUTE_GLOBAL_SKYLINE,  // global skyline computation call all with specified index across places / facilities
                     IntStream.range(0, facilityCount)
                             .mapToObj(row -> Arrays.copyOf(finalFilteredDistancesIndex[loopVal], finalFilteredDistancesIndex[loopVal].length))
                             .map(row -> Arrays.stream(row).boxed().toArray())
                             .toArray(Object[][]::new));
             if (data == null){
-                getLogger().debug("Error the output from the call for the index " +
+                getLogger().debug("Error fuck the output from the call for the index " +
                         finalFilteredDistancesIndex[i][0] + " " + finalFilteredDistancesIndex[i][1]);
             }else {
                 double[] doubleDistanceProjection = Arrays.stream(data)
@@ -157,7 +157,7 @@ public class QuickStart {
                 // System.out.println("The distance collected" + Arrays.toString(doubleDistanceProjection));
                 boolean isSkyline = distanceAlgorithm.processMinMaxDistanceAlgorithm(doubleDistanceProjection, favCount, unFavCount, finalFilteredDistancesIndex[i][0],
                         finalFilteredDistancesIndex[i][1]);
-
+                // finally if a object is found as skyline we store it and log it as the final skyline object.
                 if (isSkyline){
                     objects.add(
                             new SkylineObject(finalFilteredDistancesIndex[i][0] + 1, finalFilteredDistancesIndex[i][1] + 1) // 1 based index for row / col projection

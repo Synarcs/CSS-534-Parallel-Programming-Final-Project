@@ -12,10 +12,14 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
+/**
+ *  First Mapper to Read the input file covering binary distances / for all the facilities
+ */
 public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, Text, MapKeys, MapValue> {
 
     private MapKeys keys;
 
+    // compute the best min distance from left to right for a specific row
     private double[] getLeftDistance(double[] leftDistance, List<Double> gridRows){
         boolean isFavlFound = false;
         for (int i=0; i < gridRows.size(); i++){
@@ -32,6 +36,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
         return leftDistance;
     }
 
+    // compute the best min distance from right to left for a specific row
     private double[] getRightDistance(double[] rightDistance, List<Double> gridRows){
         boolean isFavrFound = false;
         for (int i=gridRows.size()-1; i >=0; --i){
@@ -98,6 +103,7 @@ public class GaskyMapper extends MapReduceBase implements Mapper<LongWritable, T
 
         }
 
+        // emit the k/v pairs for with the key havinf ((facility type, col), distance)) for shuffle sort phase.
         for (int values = 0; values < leftDistance.length; values++){
             // keep the grid as 0 index based for each 1.... n
             outputCollector.collect(new MapKeys(facilityName ,values + 1), new MapValue(leftDistance[values], matrixRowNumber));

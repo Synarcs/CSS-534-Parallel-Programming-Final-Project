@@ -289,6 +289,10 @@ public class SkylineGridPlaces extends Place implements Serializable {
     }
 
 
+    /*
+        Configure the dimension for the grid respective to a facility
+        Sets gridx and gridY (called uses places.callAll)
+    */
     public Object init(Object facilityName) {
         getLogger().debug("Init all the places with size " + getSize()[0]);
         int totalFacilities = getSize()[0];
@@ -310,7 +314,9 @@ public class SkylineGridPlaces extends Place implements Serializable {
         return null;
     }
 
-
+    /*
+        Places.call() invokes and provide an Array of binary Strings to init the facilityGridPlaces array
+    */
     public Object loadBinaryMatrix(Object argument) {
 
         String[] tokens = (String[]) argument;
@@ -337,7 +343,9 @@ public class SkylineGridPlaces extends Place implements Serializable {
         return null;
     }
 
-
+    /*  Same what map reduce mapper is doing/ spark mapValues or MPI each rank is performaing
+        This computes the best distance is a row wise manner where 1 resembles a facility and updates the distance grid accordingly.
+    */
     public Object computeBestAgentDistance() {
         getLogger().debug("[x] Compute the best distance across all the rows for the facility in place"
                 + getIndex()[0]);
@@ -364,7 +372,13 @@ public class SkylineGridPlaces extends Place implements Serializable {
         return null;
     }
 
+    /*
+        Same what the first reducer for map reduce does, contructs and uses voronoi polygons to get the best min distance across each column.
+        Dominance relationship finding using Voronoi Polygons
+        This algorithm is same implemented across all mapreduce, mpi, spark and mpi
+    */
     private Object computeProximityPolygons() {
+
         getLogger().debug("[x] Run the proximity Polygons across all the columns (Vornoi Polygons) for the facility in place"
                 + getIndex()[0]);
         //System.out.println("Computing proximity polygons for place " + getIndex()[0]);
@@ -428,7 +442,7 @@ public class SkylineGridPlaces extends Place implements Serializable {
         return null;
     }
 
-
+    // A custom function to provide the distance value at a given index in distance grid, this is mainly used global skyline Min/Max algorithm
     public Object loadDistance(Object argument) {
         getLogger().debug("[x] Load the best Distance from Distance Grid" + getIndex()[0]);
         //System.out.println(argument.getClass().getName() + argument.getClass().getCanonicalName());
@@ -447,7 +461,6 @@ public class SkylineGridPlaces extends Place implements Serializable {
             return (Object) Double.MAX_VALUE;
         }
     }
-
 
 
     @Override

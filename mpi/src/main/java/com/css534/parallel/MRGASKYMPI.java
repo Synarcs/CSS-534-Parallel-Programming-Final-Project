@@ -30,6 +30,9 @@ public class MRGASKYMPI {
             System.exit(1);
         }
 
+        // start timer
+        long startTime = System.currentTimeMillis();
+
         int numberOfFacilities = Integer.parseInt(args[0]);
         int m = Integer.parseInt(args[1]);
         int n = Integer.parseInt(args[2]);
@@ -71,11 +74,9 @@ public class MRGASKYMPI {
         int[] allDistributedF = new int[numRanksForF * size];
         int[] allDistributedU = new int[numRanksForU * size];
 
+        // Gather the rank distributed info on rank-0
         MPI.COMM_WORLD.Gather(distributedF, 0, numRanksForF, MPI.INT, allDistributedF, 0, numRanksForF, MPI.INT, 0);
         MPI.COMM_WORLD.Gather(distributedU, 0, numRanksForU, MPI.INT, allDistributedU, 0, numRanksForU, MPI.INT, 0);
-
-        // MPI.COMM_WORLD.Bcast(distributedF, 0, numRanksForF, MPI.INT, 0);
-        // MPI.COMM_WORLD.Bcast(distributedU, 0, numRanksForU, MPI.INT, 0);
 
         // Print the result for understnading the distribution
         if (rank == 0) {
@@ -94,10 +95,8 @@ public class MRGASKYMPI {
             System.out.println("----------------------------------------");
         }
 
-        System.out.println("Rank " + rank + " | Distributed Favorable Facilities: " + Arrays.toString(distributedF));
-        System.out.println("Rank " + rank + " | Distributed Unfavorable Facilities: " + Arrays.toString(distributedU));
-
         // Calculate the number of facilities and offset for this rank
+        // This will distribute facility grids to different rank based on count and type
         int facilities = 0;
         int offset = 1;
         if (rank < numRanksForF) {
@@ -116,22 +115,13 @@ public class MRGASKYMPI {
         }
 
         try {
-
+            // Each facility will process assigned facilities
             String filePath = "input.txt";
             double[][][] FacilityGrid = new double[facilities][m][n];
             FacilityGrid = initializeArray(facilities, offset, m, n, rank, filePath);
 
-            // if (FacilityGrid != null) {
-            //     // print out the FacilityGrid array and rank
-            //     for (int i = 0; i < FacilityGrid.length; i++) {
-
-            //         System.out.println(
-            //                 "Rank " + rank + " | FacilityGrid[" + i + "]: " + Arrays.deepToString(FacilityGrid[i]));
-            //     }
-            // }
-
-            System.out.println("Running computation on Rank-" + rank);
             // MRGASKY algorithm
+            // Step -1 calculate distance to closest facility in the same row
             for (int facility = 0; facility < facilities; facility++) {
                 for (int row = 0; row < m; row++) {
                     // Step-1 Algorithm
@@ -150,6 +140,7 @@ public class MRGASKYMPI {
             }
 
             // Step-2 Algorithm
+            // Calculate the Eucledian distance to nearest facility - column wise
             for (int facility = 0; facility < facilities; facility++) {
                 for (int column = 0; column < n; column++) {
                     // Get ordered row values for this rank
@@ -174,7 +165,7 @@ public class MRGASKYMPI {
                     // Create a new list to store filtered Vector2f objects
                     List<Vector2f> filteredCartesianProjections = new ArrayList<>();
 
-                    // Iterate over cartesianProjections and filter
+                    // Iterate over cartesianProjections and filter the points which have infinity as y-coordinate
                     for (Vector2f vector : cartesianProjections) {
                         if (vector.getYy() != Double.MAX_VALUE) {
                             filteredCartesianProjections.add(vector);
@@ -193,20 +184,7 @@ public class MRGASKYMPI {
                 }
             }
 
-            MPI.COMM_WORLD.Barrier();
-            // print FacilityGrid for each rank
-            // System.out.println("FacilityGrid at rank: " + rank + " and facilities: " + facilities);
-            // for (int i = 0; i < facilities; i++) {
-            //     for (int j = 0; j < m; j++) {
-            //         for (int k = 0; k < n; k++) {
-            //             System.out.print(FacilityGrid[i][j][k] + " ");
-            //         }
-            //         System.out.println();
-            //     }
-            //     System.out.println();
-            // }
-
-            // Step-3 Algorithm - Global Skyline Objects
+            // Step-3 - Apply Min-max algorithm to local skyline obejcts
             Minmax[] minmaxArray = new Minmax[m * n];
             int index = 0;
 
@@ -227,6 +205,7 @@ public class MRGASKYMPI {
                 }
             }
 
+            // Let all processes complete local skyline computation
             MPI.COMM_WORLD.Barrier();
 
             // Gather the minmaxArray to rank 0
@@ -235,28 +214,15 @@ public class MRGASKYMPI {
                 allMinmaxArray = new Minmax[m * n * size];
             }
 
+            // Gather min-max distances from all the ranks to rank-0
             MPI.COMM_WORLD.Gather(minmaxArray, 0, m * n, MPI.OBJECT, allMinmaxArray, 0, m * n, MPI.OBJECT, 0);
 
             // Print the result on rank 0
             if (rank == 0) {
-                // System.out.println("Rank 0 received gathered MinmaxArray:");
-                // for (Minmax minmax : allMinmaxArray) {
-                //     System.out.println(
-                //             "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
-                // }
-
-                // Step-4 Algorithm - Global Skyline Objects
-                // print allMinmaxArray count
-                // System.out.println("allMinmaxArray count: " + allMinmaxArray.length);
-
+                // get the non-zero fav and unfav ranks count
                 long favRankCount = java.util.Arrays.stream(distributedF).filter(value -> value != 0).count();
                 long unfavRankCount = java.util.Arrays.stream(distributedU).filter(value -> value != 0).count();
 
-                // create favminmaxArray and unfavminmaxArray to store favorable and unfavorable
-                // facilities
-                // favminmaxarray will store the favorable facilities from allminmaxarray based
-                // on allDistributedF array
-                // unfavminmaxarray will store the unfavorable facilities from allminmaxarray
                 // based on allDistributedU array
                 Minmax[][] minmaxFavArray = new Minmax[(int) favRankCount][m * n];
                 Minmax[][] minmaxUnFavArray = new Minmax[(int) unfavRankCount][m * n];
@@ -279,66 +245,30 @@ public class MRGASKYMPI {
                     }
                 }
 
-                // Print favminmaxArray and unfavminmaxArray
-                // System.out.println("favminmaxArray count: " + minmaxFavArray.length);
-                // for (Minmax[] minmaxRow : minmaxFavArray) {
-                //     for (Minmax minmax : minmaxRow) {
-                //         System.out.println(
-                //                 "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
-                //     }
-                // }
-
-                // System.out.println("unfavminmaxArray count: " + minmaxUnFavArray.length);
-                // for (Minmax[] minmaxRow : minmaxUnFavArray) {
-                //     for (Minmax minmax : minmaxRow) {
-                //         System.out.println(
-                //                 "i: " + minmax.i + " j: " + minmax.j + " min: " + minmax.min + " max: " + minmax.max);
-                //     }
-                // }
-
                 List<Minmax> globalFavFlattened = new ArrayList<>();
                 List<Minmax> globalUnFavFlattened = new ArrayList<>();
 
+                // Apply same min-max algorithm to calculate Global skyline objects
+                // first, process Favorable facilities
                 for (int j = 0; j < m * n; j++) {
                     double globalMaxIndexFav = Double.MIN_VALUE;
                     double globalMinimaIndexFav = Double.MAX_VALUE;
                     int row = 0;
                     int column = 0;
-                    // if (favRankCount == 1) {
-                    // globalMaxIndexFav = minmaxFavArray[0][j].min;
-                    // globalMinimaIndexFav = minmaxFavArray[0][j].max;
-                    // row = minmaxFavArray[0][j].i;
-                    // column = minmaxFavArray[0][j].j;
-                    // } else {
-                    for (int favFacilityCount = 0; favFacilityCount < minmaxFavArray.length; favFacilityCount++) {
 
-                        // if(j==0)
-                        // {
-                        // System.out.println("favFacilityCount: " + favFacilityCount);
-                        // System.out.println("globalMaxIndexFav: " + globalMaxIndexFav);
-                        // System.out.println("minmaxFavArray[favFacilityCount][j].max: " +
-                        // minmaxFavArray[favFacilityCount][j].max);
-                        // System.out.println("globalMinimaIndexFav: " + globalMinimaIndexFav);
-                        // System.out.println("minmaxFavArray[favFacilityCount][j].min: " +
-                        // minmaxFavArray[favFacilityCount][j].min);
-                        // }
-
+                    for (int favFacilityCount = 0; favFacilityCount < minmaxFavArray.length; favFacilityCount++)
                         globalMaxIndexFav = Double.min(globalMaxIndexFav, minmaxFavArray[favFacilityCount][j].max);
-                        globalMinimaIndexFav = Double.min(globalMinimaIndexFav,
-                                minmaxFavArray[favFacilityCount][j].min);
-                        row = minmaxFavArray[favFacilityCount][j].i;
-                        column = minmaxFavArray[favFacilityCount][j].j;
-                    }
-                    // System.out.println("index: " + j);
-                    // System.out.println("globalMinimaIndexFav: " + globalMinimaIndexFav);
-                    // System.out.println("globalMaxIndexFav: " + globalMaxIndexFav);
-                    // }
-                    // Is this correct?
+                    globalMinimaIndexFav = Double.max(globalMinimaIndexFav,
+                            minmaxFavArray[favFacilityCount][j].min);
+                    row = minmaxFavArray[favFacilityCount][j].i;
+                    column = minmaxFavArray[favFacilityCount][j].j;
+                }
                     globalFavFlattened.add(
                             new Minmax(globalMinimaIndexFav, globalMaxIndexFav, row, column));
 
                 }
 
+                // process Unfavorable facilities
                 for (int j = 0; j < m * n; j++) {
                     double globalMaxIndexUnFav = Double.MIN_VALUE;
                     double globalMinimaIndexUnFav = Double.MAX_VALUE;
@@ -367,23 +297,7 @@ public class MRGASKYMPI {
 
                 assert globalFavFlattened.size() == globalUnFavFlattened.size();
 
-                // print globalFavFlattened and globalUnFavFlattened
-                // System.out.println("globalFavFlattened");
-                // for (int i = 0; i < globalFavFlattened.size(); i++) {
-
-                //     System.out.println(globalFavFlattened.get(i).min + " " + globalFavFlattened.get(i).max + " "
-                //             + globalFavFlattened.get(i).i + " " + globalFavFlattened.get(i).j);
-                // }
-                // System.out.println("globalUnFavFlattened");
-                // for (int i = 0; i < globalUnFavFlattened.size(); i++) {
-
-                //     System.out.println(globalUnFavFlattened.get(i).min + " " + globalUnFavFlattened.get(i).max + " "
-                //             + globalUnFavFlattened.get(i).i + " " + globalUnFavFlattened.get(i).j);
-                // }
-
                 for (int i = 0; i < m * n; i++) {
-                    // use the struct for faster memory processing as compared o memory jumps
-                    // required for a 2d array case
                     double globalMaxIndexFav = globalFavFlattened.get(i).max;
                     double globalMinimaIndexFav = globalFavFlattened.get(i).min;
                     int favi = globalFavFlattened.get(i).i + 1;
@@ -391,8 +305,6 @@ public class MRGASKYMPI {
 
                     double globalMinimaIndexUnFav = globalUnFavFlattened.get(i).min;
                     double globalMaxIndexUnFav = globalUnFavFlattened.get(i).max;
-                    // int ui = minmaxUnFavList.get(i).i; int uf = minmaxUnFavList.get(i).j;
-                    // ui, uf will have same value as of favi
 
                     if (globalMinimaIndexFav != Double.MAX_VALUE && globalMinimaIndexUnFav != Double.MAX_VALUE) {
                         if (globalMinimaIndexUnFav < globalMinimaIndexFav
@@ -406,17 +318,19 @@ public class MRGASKYMPI {
                         }
                     }
                 }
+            long endTime = System.currentTimeMillis();
+            long elapsedTime = endTime - startTime;
 
-            }
-        } catch (
-
-                IOException e) {
+            if (rank == 0)
+                System.out.println("Total Elapsed Time: " + elapsedTime + " milliseconds");
+        } catch (IOException e) {
             e.printStackTrace();
         } finally {
             MPI.Finalize();
         }
     }
 
+    // Initialize the ranks with facility grids
     private static double[][][] initializeArray(int facility, int offset, int m, int n, int rank, String filePath)
             throws IOException {
         if (facility > 0) {
@@ -455,10 +369,8 @@ public class MRGASKYMPI {
                             facilityGrid[facilityIndex - offset][row][j] = rowValues[j];
                         }
                     }
-
                 }
             }
-
             return facilityGrid;
 
         } else {
@@ -466,7 +378,7 @@ public class MRGASKYMPI {
         }
     }
 
-    // #region MRGASKYMPI Classes and helpers
+    //region MRGASKYMPI Classes and helpers
     public static class Minmax implements Serializable {
         double min;
         double max;
@@ -560,19 +472,6 @@ public class MRGASKYMPI {
         return vector2F;
     }
 
-    private List<Vector2f> getSkylinePoints(double[][] grid) {
-        List<Vector2f> skylinePoints = new ArrayList<>();
-        for (int col = 0; col < grid[0].length; col++) {
-            for (int row = 0; row < grid.length; row++) {
-                if (grid[row][col] == 1) {
-                    skylinePoints.add(new Vector2f(col + 1, row + 1));
-                    break; // Assuming there's at most one skyline point per column
-                }
-            }
-        }
-        return skylinePoints;
-    }
-
     private static double findEuclideanDistance(double x, double y, double x1, double y1) {
         return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
     }
@@ -615,6 +514,7 @@ public class MRGASKYMPI {
         return mergedInterval;
     }
 
+    // GASKY algorithm to calculate dominant points using voronoi polygons(Local skyline objects)
     private static SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, int gridSize)
             throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
@@ -751,6 +651,7 @@ public class MRGASKYMPI {
                 distances, cartesianProjectPoints);
     }
 
+    // Get rows with distances in the order
     private static List<Map.Entry<Integer, Double>> getOrderedRowValues(int columnIndex, int m, int n,
                                                                         double[][] FacilityGrid, int rank) {
         List<Map.Entry<Integer, Double>> orderedMap = new ArrayList<>();
@@ -799,6 +700,6 @@ public class MRGASKYMPI {
         }
         return dist_right_left;
     }
-    // #endregion
+    //endregion
 
 }

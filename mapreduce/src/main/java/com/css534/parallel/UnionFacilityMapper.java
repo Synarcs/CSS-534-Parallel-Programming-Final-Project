@@ -14,7 +14,7 @@ import java.io.IOException;
 import static com.css534.parallel.DelimeterRegexConsts.*;
 
 /**
- *  Combines all the skyline objects for each each facility and emits
+ *  Combines all the skyline objects for  each facility and emits
  *  The union is done for each column and then reducer will reduce to make sure we get global unique skyline objects
  */
 @SuppressWarnings("unused")
@@ -44,11 +44,13 @@ public class UnionFacilityMapper extends MapReduceBase implements Mapper<LongWri
 
         boolean isUnfavorableFacility = facilityName.trim().indexOf("-") != -1 ? true : false;
 
+        // this is same like flamap to pair in spark
+        // we are basically emitting more number k/ v paris for each row and column with the value containing the  type of facility
+        // and associated best distance respective to a facility which are further globally reduced further again to get the global skyline.
+
         int rowIndex = 1;
         for (int i=2; i < dataSplit.length; i++){
             GlobalOrderSkylineKey key = new GlobalOrderSkylineKey(rowIndex, columnProjection);
-
-            // System.out.println(key.getColNumber() + " " + key.getRowNumber() + " " + value.getFacilityType() + " " + value.getxProjectionsValue());
 
             // throw new RuntimeException();
             if (isUnfavorableFacility){
