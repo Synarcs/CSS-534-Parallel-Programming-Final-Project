@@ -7,14 +7,14 @@ import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import scala.Tuple2;
-import scala.Int;
 
 import java.io.Serializable;
 import java.util.*;
 import java.util.stream.Collectors;
 
 public class Main implements Serializable {
-    private final static int clusterSize = 4;
+    private static int clusterSize = 4; // default for now will be talne  as the input in runtime to overwrite
+    // base benchmarking for the cluster was done with the above mentioned size.
     private final static boolean DEBUG = false;
     private static Logger log = LoggerFactory.getLogger(Main.class);
 
