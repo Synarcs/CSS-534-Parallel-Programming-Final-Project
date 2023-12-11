@@ -36,7 +36,7 @@ public class QuickStart {
 
     private static Log4J2Logger getLogger() { return MASS.getLogger(); }
 
-    private static String[][] readBinaryInput(String filename, int gridSize, int facilityCount){
+    private static synchronized String[][] readBinaryInput(String filename, int gridSize, int facilityCount){
         Map<String, List<String>> orderMap = new LinkedHashMap<>();
         getLogger().debug("Reading the binary Grid Matrix");
 
@@ -108,7 +108,7 @@ public class QuickStart {
 //
 //
         MASS.getLogger().debug("Initiating the places Grid across the grid");
-        Places spatialGrid = new Places(1, SkylineGridPlaces.class.getName(), (Object) "input", facilityCount);
+        Places spatialGrid = new Places(1, SkylineGridPlaces.class.getName(), (Object) 0, facilityCount);
 
 
         int[] fx = new int[]{gridX , gridY};
@@ -141,23 +141,30 @@ public class QuickStart {
         for (int i=0; i <  finalFilteredDistancesIndex.length; i++){
             int loopVal = i;
             //System.out.println("the length for this called" + arrayOfObjects.length + " " + arrayOfObjects[0].length);
-            double[] doubleDistanceProjection = Arrays.stream(spatialGrid.callAll(COMPUTE_GLOBAL_SKYLINE,
-                            IntStream.range(0, facilityCount)
-                                    .mapToObj(row -> Arrays.copyOf(finalFilteredDistancesIndex[loopVal], finalFilteredDistancesIndex[loopVal].length))
-                                    .map(row -> Arrays.stream(row).boxed().toArray())
-                                    .toArray(Object[][]::new)))
-                    .mapToDouble(obj -> (double) obj)
-                    .toArray();
+            Object[] data = spatialGrid.callAll(COMPUTE_GLOBAL_SKYLINE,
+                    IntStream.range(0, facilityCount)
+                            .mapToObj(row -> Arrays.copyOf(finalFilteredDistancesIndex[loopVal], finalFilteredDistancesIndex[loopVal].length))
+                            .map(row -> Arrays.stream(row).boxed().toArray())
+                            .toArray(Object[][]::new));
+            if (data == null){
+                getLogger().debug("Error the output from the call for the index " +
+                        finalFilteredDistancesIndex[i][0] + " " + finalFilteredDistancesIndex[i][1]);
+            }else {
+                double[] doubleDistanceProjection = Arrays.stream(data)
+                        .mapToDouble(obj -> (double) obj)
+                        .toArray();
 
-            // System.out.println("The distance collected" + Arrays.toString(doubleDistanceProjection));
-            boolean isSkyline = distanceAlgorithm.processMinMaxDistanceAlgorithm(doubleDistanceProjection, favCount, unFavCount, finalFilteredDistancesIndex[i][0],
-                    finalFilteredDistancesIndex[i][1]);
+                // System.out.println("The distance collected" + Arrays.toString(doubleDistanceProjection));
+                boolean isSkyline = distanceAlgorithm.processMinMaxDistanceAlgorithm(doubleDistanceProjection, favCount, unFavCount, finalFilteredDistancesIndex[i][0],
+                        finalFilteredDistancesIndex[i][1]);
 
-            if (isSkyline){
-                objects.add(
-                        new SkylineObject(finalFilteredDistancesIndex[i][0] + 1, finalFilteredDistancesIndex[i][1] + 1) // 1 based index for row / col projection
-                );
+                if (isSkyline){
+                    objects.add(
+                            new SkylineObject(finalFilteredDistancesIndex[i][0] + 1, finalFilteredDistancesIndex[i][1] + 1) // 1 based index for row / col projection
+                    );
+                }
             }
+
         }
         getLogger().debug("The Skyline objects are:");
         for (SkylineObject object: objects){

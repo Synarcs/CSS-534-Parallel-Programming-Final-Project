@@ -2,7 +2,9 @@ package com.css534.parallel;
 
 import edu.uw.bothell.css.dsl.MASS.Agent;
 
-public class SkylineGridAgent extends Agent {
+import java.io.Serializable;
+
+public class SkylineGridAgent extends Agent implements Serializable {
 
     public SkylineGridAgent(Object argument){ super();}
     public SkylineGridAgent() { super();}

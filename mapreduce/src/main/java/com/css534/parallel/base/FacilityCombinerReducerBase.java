@@ -17,7 +17,7 @@ import static com.css534.parallel.DelimeterRegexConsts.UNFAVOURABLE_POSITION;
 
 
 /**
- *  This reducer class is only menat for debugging the calculation for the global skyline objects
+ *  This reducer class is only meant for debugging the calculation for the global skyline objects
  */
 @SuppressWarnings("unused")
 public class FacilityCombinerReducerBase extends MapReduceBase implements Reducer<GlobalOrderSkylineKey, Text, Text, Text> {

@@ -3,11 +3,13 @@ package com.css534.parallel;
 import org.apache.hadoop.io.WritableComparable;
 import org.apache.hadoop.io.WritableComparator;
 
+import java.io.Serializable;
+
 
 /*
         Custom Parition Key and the value is the Distance Key
  */
-public class RouteComparator extends WritableComparator {
+public class RouteComparator extends WritableComparator implements Serializable {
 
     protected RouteComparator(){
         super(MapKeys.class, true);

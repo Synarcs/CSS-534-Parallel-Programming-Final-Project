@@ -5,6 +5,7 @@ import edu.uw.bothell.css.dsl.MASS.Place;
 import edu.uw.bothell.css.dsl.MASS.logging.Log4J2Logger;
 
 import java.io.FileInputStream;
+import java.io.Serializable;
 import java.util.AbstractMap;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -25,16 +26,13 @@ import static com.css534.parallel.GridConstants.UNFAVOURABLE;
 
 
 @SuppressWarnings("unused")
-public class SkylineGridPlaces extends Place {
+public class SkylineGridPlaces extends Place implements Serializable {
     // file object to be read by all the places file shared across all the computing
     // nodes
     public static FileInputStream file = null;
-    public static String filename = null;
     private static boolean debug = false;
 
-    public SkylineGridPlaces(Object object) {
-        filename = (String) object;
-    }
+    public SkylineGridPlaces(Object object) {}
 
     public SkylineGridPlaces() {
         super();
@@ -49,7 +47,7 @@ public class SkylineGridPlaces extends Place {
     private int gridX = -1;
     private int gridY = -1;
 
-    private Log4J2Logger getLogger(){
+    protected Log4J2Logger getLogger(){
         return  MASS.getLogger();
     }
 
@@ -89,233 +87,20 @@ public class SkylineGridPlaces extends Place {
         return rightDistance;
     }
 
-    public Object init(Object facilityName) {
-        int totalFacilities = getSize()[0];
-        int currentFacility = getIndex()[0] + 1;
-
-        int[] gridSizePerFacility = (int[]) facilityName;
-
-
-        // create the final holder pplace to load all the arrays to the heap for the
-        // place thread
-        facilityGridPlaces = new double[gridSizePerFacility[0]][gridSizePerFacility[1]];
-        gridX = gridSizePerFacility[0];
-        gridY = gridSizePerFacility[1];
-        // favCount = gridSizePerFacility[2];
-        // unFavCount = gridSizePerFacility[3];
-        // if (currentFacility <= favCount) facilityType = FAVOURABLE;
-        // else facilityType = UNFAVOURABLE;
-
-        return null;
-    }
-
-    public void computeBestAgentDistance() {
-
-        int distanceRowIndex = 0;
-        distanceGrid = new double[gridX][gridY];
-
-        for (double[] row : facilityGridPlaces) {
-            double[] leftDistance = getLeftDistance(row);
-            double[] rightDistance = getRightDistance(row);
-
-            for (int k = 0; k < gridY; k++) {
-                distanceGrid[distanceRowIndex][k] = Double.min(
-                        leftDistance[k], rightDistance[k]);
-            }
-            distanceRowIndex++;
-        }
-
-        if (debug) {
-            for (int i = 0; i < gridX; i++) {
-                getLogger().debug(Arrays.toString(distanceGrid[i]));
-            }
-        }
-    }
-
-    private void computeProximityPolygons() {
-        //System.out.println("Computing proximity polygons for place " + getIndex()[0]);
-        for (int column = 0; column < gridY; column++) {
-
-            // System.out.println("Started Computing proximity polygons for place " + getIndex()[0] + " and column "
-            // + column);
-            List<Map.Entry<Integer, Double>> orderedMap = getOrderedRowValues(column, gridX, distanceGrid);
-
-            int gridSize = orderedMap.size();
-
-            // Create a list to store Vector2f objects
-            List<Vector2f> cartesianProjections = new ArrayList<>();
-
-            // Iterate over orderedMap and create Vector2f objects
-            for (Map.Entry<Integer, Double> value : orderedMap) {
-                int key = value.getKey();
-                double val = value.getValue();
-
-                Vector2f vector = new Vector2f(key, val);
-                cartesianProjections.add(vector);
-            }
-
-            // Create a new list to store filtered Vector2f objects
-            List<Vector2f> filteredCartesianProjections = new ArrayList<>();
-
-            // Iterate over cartesianProjections and filter
-            for (Vector2f vector : cartesianProjections) {
-                if (vector.getYy() != Double.MAX_VALUE) {
-                    filteredCartesianProjections.add(vector);
-                }
-            }
-
-            // Replace the original list with the filtered one
-            cartesianProjections = filteredCartesianProjections;
-
-            // Calculate skyline objects for this rank
-            SkylineObjects skylineObject = mrGaskyAlgorithm(cartesianProjections, gridSize);
-
-            // System.out.println("Skyline Objects for places " + getIndex()[0] + " and column " + column);
-            if (debug){
-                for (Vector2f vector : skylineObject.getSkylineObjects()) {
-                    getLogger().debug(vector.getXx() + " " + vector.getYy());
-                }
-            }
-
-
-            for (int i = 0; i < skylineObject.getDistances().size(); i++) {
-                distanceGrid[i][column] = skylineObject.getDistances().get(i);
-            }
-        }
-
-        if (debug){
-            getLogger().debug("Distance Grid for places " + getIndex()[0]);
-        }
-
-        for (int i = 0; i < distanceGrid.length; i++) {
-            getLogger().debug(Arrays.toString(distanceGrid[i]));
-        }
-
-    }
-
-    public double loadDistance(Object argument) {
-
-        //System.out.println(argument.getClass().getName() + argument.getClass().getCanonicalName());
-        Object[] indexAskedByAgent = (Object[]) argument;
-        int[] intArray = Arrays.stream(indexAskedByAgent)
-                .mapToInt(obj -> (int) obj)
-                .toArray();
-        //System.out.println("the arguments are" + Arrays.toString(intArray));
-        try {
-            if (distanceGrid == null)
-                throw new RuntimeException("Eror please call agent call before");
-            //System.out.println("from the place " + " " + getIndex()[0] + " " + getSize()[0]);
-            return distanceGrid[intArray[0]][intArray[1]];
-        } catch (RuntimeException exception) {
-            exception.printStackTrace();
-            return Double.MAX_VALUE;
-        }
-    }
-
-    public void loadBinaryMatrix(Object argument) {
-
-        String[] tokens = (String[]) argument;
-        // System.out.println("Binary tokens at this place" + Arrays.toString(tokens) + " " + getIndex()[0]);
-
-        for (int i = 0; i < tokens.length; i++) {
-            for (int j = 0; j < tokens[0].length(); j++) {
-                facilityGridPlaces[i][j] = Double.valueOf(
-                        Character.getNumericValue(tokens[i].charAt(j)));
-            }
-        }
-
-        // TODO: chage everything to use mass debug log
-        if (debug) {
-            getLogger().debug("for place id " + getIndex()[0]);
-
-            for (int i = 0; i < facilityGridPlaces.length; i++) {
-                getLogger().debug(Arrays.toString(facilityGridPlaces[i]));
-            }
-        }
-
-        return;
-    }
-
     // #region Skyline Algorithm
-    public static class Vector2f {
-        private double xx;
-        private double yy;
 
-        public Vector2f(double xx, double yy) {
-            this.xx = xx;
-            this.yy = yy;
-        }
-
-        public double getXx() {
-            return xx;
-        }
-
-        public double getYy() {
-            return yy;
-        }
-    }
-
-    public static class Vector2FProjections {
-        private double xx;
-        private double yy;
-
-        public Vector2FProjections(double xx, double yy) {
-            this.xx = xx;
-            this.yy = yy;
-        }
-
-        public double getXx() {
-            return xx;
-        }
-
-        public double getYy() {
-            return yy;
-        }
-
-        public void setYy(double yy) {
-            this.yy = yy;
-        }
-
-        public void setXx(double xx) {
-            this.xx = xx;
-        }
-    }
-
-    public static class SkylineObjects {
-        private List<Double> distances;
-        private List<Vector2f> skylineObjects;
-
-        SkylineObjects() {
-            this(new ArrayList<>(), new ArrayList<>());
-        }
-
-        SkylineObjects(List<Double> distances, List<Vector2f> skylineObjects) {
-            this.distances = distances;
-            this.skylineObjects = skylineObjects;
-        }
-
-        public List<Double> getDistances() {
-            return distances;
-        }
-
-        public List<Vector2f> getSkylineObjects() {
-            return skylineObjects;
-        }
-    }
-
-    private static List<Map.Entry<Integer, Double>> getOrderedRowValues(int columnIndex, int m,
-                                                                        double[][] FacilityGrid) {
-        List<Map.Entry<Integer, Double>> orderedMap = new ArrayList<>();
+    private List<Map.Entry<Integer, Double>> getRowProjectionsPoints(int columnIndex, int m) {
+        List<Map.Entry<Integer, Double>> orderedMap = new ArrayList();
         // Iterate over the specified portion of FacilityGrid
         for (int row = 0; row < m; row++) {
-            double distance = FacilityGrid[row][columnIndex];
+            double distance = distanceGrid[row][columnIndex];
             orderedMap.add(new AbstractMap.SimpleEntry<>(row + 1, distance));
         }
 
         return orderedMap;
     }
 
-    private static SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, int gridSize)
+    private SkylineObjects mrGaskyAlgorithm(List<Vector2f> cartesianProjectPoints, int gridSize)
             throws RuntimeException, NoSuchElementException {
         int totalPoints = cartesianProjectPoints.size();
         List<Double> distances = new ArrayList<>(Collections.nCopies(gridSize, Double.MAX_VALUE));
@@ -451,11 +236,11 @@ public class SkylineGridPlaces extends Place {
                 distances, cartesianProjectPoints);
     }
 
-    private static double findEuclideanDistance(double x, double y, double x1, double y1) {
+    private double findEuclideanDistance(double x, double y, double x1, double y1) {
         return Math.sqrt((x1 - x) * (x1 - x) + (y1 - y) * (y1 - y));
     }
 
-    private static Deque<Vector2f> findProximityPointsSingle(List<Vector2f> unDominatedPoints) {
+    private Deque<Vector2f> findProximityPointsSingle(List<Vector2f> unDominatedPoints) {
         Deque<Vector2f> intervals = new LinkedList<>();
         for (int i = 1; i < unDominatedPoints.size(); i++) {
             Vector2f point1 = unDominatedPoints.get(i - 1);
@@ -469,7 +254,7 @@ public class SkylineGridPlaces extends Place {
         return intervals;
     }
 
-    private static List<double[]> findProximityPoints(List<Vector2f> unDominatedPoints, int gridSize) {
+    private List<double[]> findProximityPoints(List<Vector2f> unDominatedPoints, int gridSize) {
         List<Vector2f> intervals = new ArrayList<>();
         for (int i = 1; i < unDominatedPoints.size(); i++) {
             Vector2f point1 = unDominatedPoints.get(i - 1);
@@ -493,41 +278,197 @@ public class SkylineGridPlaces extends Place {
         return mergedInterval;
     }
 
-    private static Vector2FProjections calcBisectorProjections(double x, double y, double x1, double y1) {
+    private static Vector2f calcBisectorProjections(double x, double y, double x1, double y1) {
 
         double xx = ((y1 * y1) - (y * y) + (x1 * x1) - (x * x)) / (2 * (x1 - x));
         double yy = 0;
 
-        Vector2FProjections vector2F = new Vector2FProjections(xx, yy);
+        Vector2f vector2F = new Vector2f(xx, yy);
 
         return vector2F;
     }
+
+
+    public Object init(Object facilityName) {
+        getLogger().debug("Init all the places with size " + getSize()[0]);
+        int totalFacilities = getSize()[0];
+        int currentFacility = getIndex()[0] + 1;
+
+        int[] gridSizePerFacility = (int[]) facilityName;
+
+
+        // create the final holder pplace to load all the arrays to the heap for the
+        // place thread
+        facilityGridPlaces = new double[gridSizePerFacility[0]][gridSizePerFacility[1]];
+        gridX = gridSizePerFacility[0];
+        gridY = gridSizePerFacility[1];
+        // favCount = gridSizePerFacility[2];
+        // unFavCount = gridSizePerFacility[3];
+        // if (currentFacility <= favCount) facilityType = FAVOURABLE;
+        // else facilityType = UNFAVOURABLE;
+
+        return null;
+    }
+
+
+    public Object loadBinaryMatrix(Object argument) {
+
+        String[] tokens = (String[]) argument;
+        getLogger().debug("[x] Init the binary distance grid at place" + getIndex()[0]);
+
+        // System.out.println("Binary tokens at this place" + Arrays.toString(tokens) + " " + getIndex()[0]);
+
+        MASS.getLogger().debug("the tokens are" + tokens.toString());
+        for (int i = 0; i < tokens.length; i++) {
+            for (int j = 0; j < tokens[0].length(); j++) {
+                facilityGridPlaces[i][j] = Double.valueOf(
+                        Character.getNumericValue(tokens[i].charAt(j)));
+            }
+        }
+
+        if (debug) {
+            getLogger().debug("for place id " + getIndex()[0]);
+
+            for (int i = 0; i < facilityGridPlaces.length; i++) {
+                getLogger().debug(Arrays.toString(facilityGridPlaces[i]));
+            }
+        }
+
+        return null;
+    }
+
+
+    public Object computeBestAgentDistance() {
+        getLogger().debug("[x] Compute the best distance across all the rows for the facility in place"
+                + getIndex()[0]);
+        int distanceRowIndex = 0;
+        distanceGrid = new double[gridX][gridY];
+
+        for (double[] row : facilityGridPlaces) {
+            double[] leftDistance = getLeftDistance(row);
+            double[] rightDistance = getRightDistance(row);
+
+            for (int k = 0; k < gridY; k++) {
+                distanceGrid[distanceRowIndex][k] = Double.min(
+                        leftDistance[k], rightDistance[k]);
+            }
+            distanceRowIndex++;
+        }
+
+        if (debug) {
+            for (int i = 0; i < gridX; i++) {
+                getLogger().debug(Arrays.toString(distanceGrid[i]));
+            }
+        }
+
+        return null;
+    }
+
+    private Object computeProximityPolygons() {
+        getLogger().debug("[x] Run the proximity Polygons across all the columns (Vornoi Polygons) for the facility in place"
+                + getIndex()[0]);
+        //System.out.println("Computing proximity polygons for place " + getIndex()[0]);
+        for (int column = 0; column < gridY; column++) {
+
+            // System.out.println("Started Computing proximity polygons for place " + getIndex()[0] + " and column "
+            // + column);
+            List<Map.Entry<Integer, Double>> orderedMap = getRowProjectionsPoints(column, gridX);
+
+            int gridSize = orderedMap.size();
+
+            // Create a list to store Vector2f objects
+            List<Vector2f> cartesianProjections = new ArrayList<>();
+
+            // Iterate over orderedMap and create Vector2f objects
+            for (Map.Entry<Integer, Double> value : orderedMap) {
+                int key = value.getKey(); // column projection value
+                double val = value.getValue();  // row projection value
+
+                Vector2f vector = new Vector2f(key, val);
+                cartesianProjections.add(vector);
+            }
+
+            // Create a new list to store filtered Vector2f objects
+            List<Vector2f> filteredCartesianProjections = new ArrayList<>();
+
+            // Iterate over cartesianProjections and filter
+            for (Vector2f vector : cartesianProjections) {
+                if (vector.getYy() != Double.MAX_VALUE) {
+                    filteredCartesianProjections.add(vector);
+                }
+            }
+
+            // Replace the original list with the filtered one
+            cartesianProjections = filteredCartesianProjections;
+
+            // Calculate skyline objects for this rank
+            SkylineObjects skylineObject = mrGaskyAlgorithm(cartesianProjections, gridSize);
+
+            // System.out.println("Skyline Objects for places " + getIndex()[0] + " and column " + column);
+            if (debug){
+                for (Vector2f vector : skylineObject.getSkylineObjects()) {
+                    getLogger().debug(vector.getXx() + " " + vector.getYy());
+                }
+            }
+
+
+            for (int i = 0; i < skylineObject.getDistances().size(); i++) {
+                distanceGrid[i][column] = skylineObject.getDistances().get(i);
+            }
+        }
+
+        if (debug){
+            getLogger().debug("Distance Grid for places " + getIndex()[0]);
+        }
+
+        for (int i = 0; i < distanceGrid.length; i++) {
+            getLogger().debug(Arrays.toString(distanceGrid[i]));
+        }
+
+        return null;
+    }
+
+
+    public Object loadDistance(Object argument) {
+        getLogger().debug("[x] Load the best Distance from Distance Grid" + getIndex()[0]);
+        //System.out.println(argument.getClass().getName() + argument.getClass().getCanonicalName());
+        Object[] indexAskedByAgent = (Object[]) argument;
+        int[] intArray = Arrays.stream(indexAskedByAgent)
+                .mapToInt(obj -> (int) obj)
+                .toArray();
+        //System.out.println("the arguments are" + Arrays.toString(intArray));
+        try {
+            if (distanceGrid == null)
+                throw new RuntimeException("Eror please call agent call before");
+            //System.out.println("from the place " + " " + getIndex()[0] + " " + getSize()[0]);
+            return (Object) distanceGrid[intArray[0]][intArray[1]];
+        } catch (RuntimeException exception) {
+            exception.printStackTrace();
+            return (Object) Double.MAX_VALUE;
+        }
+    }
+
+
 
     @Override
     public Object callMethod(int functionId, Object argument) {
         switch (functionId) {
             case INIT: {
-                init(argument);
-                break;
+                return init(argument);
             }
             case INIT_BINARY_MATRIX: {
-                loadBinaryMatrix(argument);
-                break;
+                return loadBinaryMatrix(argument);
             }
             case COMPUTE_BEST_ROW_DISTANCE: {
-                computeBestAgentDistance();
-                break;
+                return computeBestAgentDistance();
             }
             case COMPUTE_PROXIMITY_POLYGONS: {
-                computeProximityPolygons();
-                break;
+                return computeProximityPolygons();
             }
             case COMPUTE_GLOBAL_SKYLINE: {
                 return loadDistance(argument);
             }
-            default: { break; }
         }
         return null;
     }
-
 }
