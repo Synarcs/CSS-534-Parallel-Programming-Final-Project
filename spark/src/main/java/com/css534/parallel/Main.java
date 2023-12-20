@@ -6,6 +6,7 @@ import org.apache.spark.api.java.JavaRDD;
 import org.apache.spark.api.java.JavaSparkContext;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import scala.Int;
 import scala.Tuple2;
 
 import java.io.Serializable;
@@ -170,6 +171,7 @@ public class Main implements Serializable {
                 for (Tuple2<Integer, Double> combinedCoordinateprojection: projectedPointPlane){
                     if (combinedCoordinateprojection._1() == FAVOURABLE_POSITION)
                         processGridData[0].add(
+
                                 combinedCoordinateprojection._2()
                         );
                     else
@@ -206,6 +208,14 @@ public class Main implements Serializable {
                 filterDominantGlobalPoints.collect().forEach((reducedProjections) -> {
                     log.info(reducedProjections._1() + "<--->" + reducedProjections._2());
                 });
+
+            JavaPairRDD<String, Iterable<Integer>> processData = filterDominantGlobalPoints.map((Tuple2<Tuple2<Integer, Integer>, Boolean> loader) -> {
+                        return new StringBuilder(loader._1()._1() + loader._1()._1()).toString();
+                    }).map((String values) -> values.length()).coalesce(3)
+                    .mapToPair((values) -> {
+                                return new Tuple2<>(String.valueOf(values), values * 2);
+                            }).groupByKey();
+
 
             // filter out the skyline coordinates that are not skyline objects
             filterDominantGlobalPoints = filterDominantGlobalPoints.filter((Tuple2<Tuple2<Integer, Integer>, Boolean> value) -> value._2());

@@ -38,4 +38,8 @@ render/*.class
 ### Mac OS ###
 .DS_Store
 
+
+Peer Evaluation Report/*
+Lab5/*
+
 *.class

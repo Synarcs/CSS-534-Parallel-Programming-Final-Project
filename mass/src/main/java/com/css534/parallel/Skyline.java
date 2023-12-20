@@ -15,7 +15,6 @@ import java.util.List;
 import java.util.Map;
 
 import java.util.stream.IntStream;
-import java.util.stream.Stream;
 
 import static com.css534.parallel.GridConstants.INIT;
 import static com.css534.parallel.GridConstants.INIT_BINARY_MATRIX;
@@ -143,14 +142,16 @@ public class Skyline {
             // So basically to call all places to get index 1,1 location we do places.callAlL(COMPUTE_GLOBAL_SKYLINE, [[1,1],[1,1]...]n (place count).
             Object[] data = spatialGrid.callAll(COMPUTE_GLOBAL_SKYLINE,  // global skyline computation call all with specified index across places / facilities
                     IntStream.range(0, facilityCount)
+                            .parallel()
                             .mapToObj(row -> Arrays.copyOf(finalFilteredDistancesIndex[loopVal], finalFilteredDistancesIndex[loopVal].length))
                             .map(row -> Arrays.stream(row).boxed().toArray())
                             .toArray(Object[][]::new));
             if (data == null){
-                getLogger().debug("Error fuck the output from the call for the index " +
+                getLogger().debug("Error the output from the call for the index " +
                         finalFilteredDistancesIndex[i][0] + " " + finalFilteredDistancesIndex[i][1]);
             }else {
                 double[] doubleDistanceProjection = Arrays.stream(data)
+                        .parallel()
                         .mapToDouble(obj -> (double) obj)
                         .toArray();
 

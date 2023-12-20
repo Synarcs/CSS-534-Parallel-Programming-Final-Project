@@ -1,5 +1,7 @@
 package com.css534.parallel;
 
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.apache.hadoop.mapreduce.Partitioner;
 
 /**
@@ -8,6 +10,8 @@ import org.apache.hadoop.mapreduce.Partitioner;
  */
 @SuppressWarnings("unused")
 public class GlobalOrderSkylinePartioner extends Partitioner<GlobalOrderSkylineKey, Object> {
+
+    private Log log = LogFactory.getLog(GlobalOrderSkylinePartioner.class);
 
     @Override
     public int getPartition(GlobalOrderSkylineKey key, Object value, int numPartitions) throws IllegalArgumentException{

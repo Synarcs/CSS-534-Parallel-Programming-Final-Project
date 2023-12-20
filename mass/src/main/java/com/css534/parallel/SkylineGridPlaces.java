@@ -1,7 +1,8 @@
 package com.css534.parallel;
 
-import edu.uw.bothell.css.dsl.MASS.MASS;
-import edu.uw.bothell.css.dsl.MASS.Place;
+import edu.uw.bothell.css.dsl.MASS.*;
+import edu.uw.bothell.css.dsl.MASS.graph.Graph;
+import edu.uw.bothell.css.dsl.MASS.graph.transport.VertexModel;
 import edu.uw.bothell.css.dsl.MASS.logging.Log4J2Logger;
 
 import java.io.FileInputStream;
@@ -23,6 +24,28 @@ import static com.css534.parallel.GridConstants.COMPUTE_PROXIMITY_POLYGONS;
 import static com.css534.parallel.GridConstants.COMPUTE_GLOBAL_SKYLINE;
 import static com.css534.parallel.GridConstants.FAVOURABLE;
 import static com.css534.parallel.GridConstants.UNFAVOURABLE;
+//
+//class PublicLoaderAgent extends  Agent {
+//    public void sample(){
+//        int index = (Integer) getPlace().getIndex()[0];
+//        if (index != -1){}
+//
+//    }
+//}
+//
+//class LoaderPlace extends VertexPlace {
+//    public void testGraphPlace(){
+//        GraphPlaces network = new GraphPlaces(1);
+//        List<VertexModel> vertices = network.getGraph().getVertices();
+//        int nodeCount = vertices.size();
+//
+//        // get all the vertex ids in the distributed map for all over the graph places distributed;
+//        Integer[] indices = vertices.stream().map((VertexModel vertexModel) -> {
+//            int vertexId = (int) vertexModel.id;
+//        });
+//
+//    }
+//}
 
 
 @SuppressWarnings("unused")
